@@ -1,3 +1,4 @@
+// lib/models/scan_result.dart
 import 'package:hive/hive.dart';
 
 part 'scan_result.g.dart';
@@ -39,11 +40,11 @@ enum ScanSource {
 }
 
 @HiveType(typeId: 0)
-class ScanResult {
+class ScanResult extends HiveObject {
   @HiveField(0)
   final String url;
   @HiveField(1)
-  final int riskScore;
+  final int riskScore; // 0-100
   @HiveField(2)
   final RiskLevel riskLevel;
   @HiveField(3)
@@ -66,7 +67,7 @@ class ScanResult {
     required this.recommendation,
     required this.source,
     required this.timestamp,
-  }) : assert(riskScore >= 0 && riskScore <= 100, 'riskScore must be between 0 and 100');
+  }) : assert(riskScore >= 0 && riskScore <= 100);
 
   Map<String, dynamic> toJson() => {
         'url': url,
@@ -80,44 +81,13 @@ class ScanResult {
       };
 
   factory ScanResult.fromJson(Map<String, dynamic> json) => ScanResult(
-        url: json['url'] as String? ?? '',
-        riskScore: (json['riskScore'] as num?)?.toInt() ?? 0,
-        riskLevel: RiskLevel.values.firstWhere(
-          (e) => e.name == json['riskLevel'],
-          orElse: () => RiskLevel.safe,
-        ),
-        threatType: ThreatType.values.firstWhere(
-          (e) => e.name == json['threatType'],
-          orElse: () => ThreatType.none,
-        ),
-        reasons: (json['reasons'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
-        recommendation: json['recommendation'] as String? ?? '',
-        source: ScanSource.values.firstWhere(
-          (e) => e.name == json['source'],
-          orElse: () => ScanSource.manual,
-        ),
-        timestamp: json['timestamp'] != null
-            ? DateTime.tryParse(json['timestamp'] as String) ?? DateTime.now()
-            : DateTime.now(),
+        url: json['url'] as String,
+        riskScore: json['riskScore'] as int,
+        riskLevel: RiskLevel.values.byName(json['riskLevel'] as String),
+        threatType: ThreatType.values.byName(json['threatType'] as String),
+        reasons: List<String>.from(json['reasons'] as List),
+        recommendation: json['recommendation'] as String,
+        source: ScanSource.values.byName(json['source'] as String),
+        timestamp: DateTime.parse(json['timestamp'] as String),
       );
-
-  @override
-  String toString() =>
-      'ScanResult(url: $url, riskScore: $riskScore, riskLevel: $riskLevel, threatType: $threatType, reasons: $reasons, recommendation: $recommendation, source: $source, timestamp: $timestamp)';
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ScanResult &&
-          other.url == url &&
-          other.riskScore == riskScore &&
-          other.riskLevel == riskLevel &&
-          other.threatType == threatType &&
-          other.reasons == reasons &&
-          other.recommendation == recommendation &&
-          other.source == source &&
-          other.timestamp == timestamp;
-
-  @override
-  int get hashCode => Object.hash(url, riskScore, riskLevel, threatType, reasons, recommendation, source, timestamp);
 }

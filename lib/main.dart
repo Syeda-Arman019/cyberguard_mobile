@@ -3,7 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'services/history_service.dart';
 import 'screens/home_screen.dart';
 
-import 'models/scan_result.dart';
+import 'screens/share_receive_screen.dart';
 
 /// Global navigator key used by ShareIntentHandler
 final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
