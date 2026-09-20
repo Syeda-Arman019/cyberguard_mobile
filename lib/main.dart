@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'models/scan_result.dart';
 import 'services/history_service.dart';
 import 'screens/home_screen.dart';
-
 import 'screens/share_receive_screen.dart';
 
 /// Global navigator key used by ShareIntentHandler

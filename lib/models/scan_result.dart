@@ -58,7 +58,7 @@ class ScanResult extends HiveObject {
   @HiveField(7)
   final DateTime timestamp;
 
-  const ScanResult({
+  ScanResult({
     required this.url,
     required this.riskScore,
     required this.riskLevel,
