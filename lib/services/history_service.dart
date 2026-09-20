@@ -45,6 +45,8 @@ class HistoryService {
     }
   }
 
-  /// Expose the underlying box for UI (e.g., ValueListenableBuilder).
-  Box<ScanResult> get box => _box;
+  /// Delete all stored scan history.
+  Future<void> deleteAllScans() async {
+    await _box.clear();
+  }
 }

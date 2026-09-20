@@ -112,11 +112,17 @@ class RiskEngine {
       // Cap risk score between 0 and 100
       final int riskScore = score.clamp(0, 100);
 
-      // Determine Risk Level: 0-30 safe, 31-60 suspicious, 61-100 malicious
+            // Determine Risk Level with priority overrides
       final RiskLevel riskLevel;
-      if (riskScore <= 30) {
+      if (hasGoogleThreat) {
+        // Any Google Safe Browsing threat (phishing or malware) forces Malicious
+        riskLevel = RiskLevel.malicious;
+      } else if (isBrandImpersonation) {
+        // Brand impersonation is treated as Suspicious regardless of score
+        riskLevel = RiskLevel.suspicious;
+      } else if (riskScore <= 40) {
         riskLevel = RiskLevel.safe;
-      } else if (riskScore <= 60) {
+      } else if (riskScore <= 70) {
         riskLevel = RiskLevel.suspicious;
       } else {
         riskLevel = RiskLevel.malicious;

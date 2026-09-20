@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import '../../models/scan_result.dart';
+import 'package:intl/intl.dart';
 
 /// Reusable card widget to display the complete security scan results.
 class ResultCard extends StatelessWidget {
   final ScanResult scanResult;
   final VoidCallback? onAction;
   final String? actionLabel;
+  final VoidCallback? onDelete; // optional delete callback
 
   const ResultCard({
     super.key,
     required this.scanResult,
     this.onAction,
     this.actionLabel,
+    this.onDelete,
   });
 
   /// Maps [RiskLevel] to thematic status colors.
@@ -58,8 +61,8 @@ class ResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final riskColor = _getRiskColor(scanResult.riskLevel);
-
+    final displayRiskLevel = scanResult.threatType == ThreatType.suspiciousDomain ? RiskLevel.suspicious : scanResult.riskLevel;
+    final riskColor = _getRiskColor(displayRiskLevel);
     return Card(
       elevation: 2,
       child: Padding(
