@@ -1,5 +1,7 @@
-// lib/screens/manual_scan_screen.dart (clean implementation)
+// lib/screens/manual_scan_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../core/theme.dart';
 import '../models/scan_result.dart';
 import '../services/risk_engine.dart';
 import '../services/history_service.dart';
@@ -7,7 +9,7 @@ import 'widgets/result_card.dart';
 
 class ManualScanScreen extends StatefulWidget {
   final RiskEngine? riskEngine;
-  const ManualScanScreen({Key? key, this.riskEngine}) : super(key: key);
+  const ManualScanScreen({super.key, this.riskEngine});
 
   @override
   State<ManualScanScreen> createState() => _ManualScanScreenState();
@@ -32,6 +34,14 @@ class _ManualScanScreenState extends State<ManualScanScreen> {
     super.dispose();
   }
 
+  Future<void> _pasteFromClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (data?.text != null && data!.text!.trim().isNotEmpty) {
+      _urlController.text = data.text!.trim();
+      setState(() => _inputError = null);
+    }
+  }
+
   Future<void> _analyzeUrl() async {
     final rawUrl = _urlController.text.trim();
     if (rawUrl.isEmpty) {
@@ -43,72 +53,231 @@ class _ManualScanScreenState extends State<ManualScanScreen> {
       _isLoading = true;
       _inputError = null;
     });
-    final result = await _engine.analyzeUrl(rawUrl, ScanSource.manual);
-    if (!mounted) return;
-    setState(() {
-      _scanResult = result;
-      _isLoading = false;
-    });
-    // Save to history
-    await HistoryService.instance.saveScan(result);
+
+    try {
+      final result = await _engine.analyzeUrl(rawUrl, ScanSource.manual);
+      if (!mounted) return;
+      setState(() {
+        _scanResult = result;
+        _isLoading = false;
+      });
+      // Save to history
+      await HistoryService.instance.saveScan(result);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _inputError = 'Failed to analyze URL: $e';
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Manual URL Scanner')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: _urlController,
-              keyboardType: TextInputType.url,
-              textInputAction: TextInputAction.search,
-              onSubmitted: (_) => _analyzeUrl(),
-              decoration: InputDecoration(
-                labelText: 'Enter URL',
-                hintText: 'https://example.com',
-                errorText: _inputError,
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.link),
-                suffixIcon: _urlController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _urlController.clear();
-                          setState(() => _inputError = null);
-                        },
-                      )
-                    : null,
-              ),
-              onChanged: (_) {
-                if (_inputError != null) setState(() => _inputError = null);
-              },
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _isLoading ? null : _analyzeUrl,
-              icon: const Icon(Icons.security),
-              label: const Text('Analyze'),
-            ),
-            const SizedBox(height: 24),
-            if (_isLoading)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(24.0),
+      appBar: AppBar(
+        title: const Text('Manual URL Scanner'),
+        leading: Navigator.of(context).canPop()
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_rounded, color: CyberColors.cyan),
+                onPressed: () => Navigator.of(context).pop(),
+              )
+            : null,
+      ),
+      body: Container(
+        decoration: const BoxDecoration(gradient: CyberColors.backgroundGradient),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Input Container (Container styled, keeping find.byType(Card) matching tests)
+                Container(
+                  padding: const EdgeInsets.all(18.0),
+                  decoration: BoxDecoration(
+                    color: CyberColors.cardBg,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: CyberColors.border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(77),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 12),
-                      Text('Scanning URL for security threats...'),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: CyberColors.cyan.withAlpha(25),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.link_rounded, color: CyberColors.cyan, size: 20),
+                          ),
+                          const SizedBox(width: 10),
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Target URL Input',
+                                style: TextStyle(
+                                  color: CyberColors.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Enter HTTP or HTTPS address to inspect',
+                                style: TextStyle(color: CyberColors.textMuted, fontSize: 11.5),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _urlController,
+                        keyboardType: TextInputType.url,
+                        textInputAction: TextInputAction.search,
+                        style: const TextStyle(
+                          color: CyberColors.textPrimary,
+                          fontFamily: 'monospace',
+                          fontSize: 13.5,
+                        ),
+                        onSubmitted: (_) => _analyzeUrl(),
+                        decoration: InputDecoration(
+                          hintText: 'https://example.com/login',
+                          hintStyle: const TextStyle(color: CyberColors.textMuted, fontSize: 13),
+                          errorText: _inputError,
+                          errorStyle: const TextStyle(color: CyberColors.malicious),
+                          filled: true,
+                          fillColor: CyberColors.bgDark.withAlpha(150),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: CyberColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: CyberColors.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: CyberColors.cyan, width: 1.5),
+                          ),
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_urlController.text.isNotEmpty)
+                                IconButton(
+                                  icon: const Icon(Icons.clear, color: CyberColors.textMuted, size: 18),
+                                  onPressed: () {
+                                    _urlController.clear();
+                                    setState(() => _inputError = null);
+                                  },
+                                ),
+                              IconButton(
+                                icon: const Icon(Icons.paste_rounded, color: CyberColors.cyan, size: 18),
+                                tooltip: 'Paste from clipboard',
+                                onPressed: _pasteFromClipboard,
+                              ),
+                            ],
+                          ),
+                        ),
+                        onChanged: (_) {
+                          if (_inputError != null) setState(() => _inputError = null);
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: CyberColors.cyan,
+                          foregroundColor: CyberColors.bgDark,
+                          minimumSize: const Size(double.infinity, 50),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 4,
+                          shadowColor: CyberColors.cyan.withAlpha(102),
+                        ),
+                        onPressed: _isLoading ? null : _analyzeUrl,
+                        icon: const Icon(Icons.security),
+                        label: const Text(
+                          'Analyze',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-              ),
-            if (!_isLoading && _scanResult != null) ResultCard(scanResult: _scanResult!),
-          ],
+
+                const SizedBox(height: 20),
+
+                // Loading State
+                if (_isLoading)
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+                    decoration: BoxDecoration(
+                      color: CyberColors.cardBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: CyberColors.border),
+                    ),
+                    child: const Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 44,
+                          height: 44,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            valueColor: AlwaysStoppedAnimation<Color>(CyberColors.cyan),
+                          ),
+                        ),
+                        SizedBox(height: 18),
+                        Text(
+                          'Scanning URL for security threats...',
+                          style: TextStyle(
+                            color: CyberColors.textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                        SizedBox(height: 6),
+                        Text(
+                          'Running heuristic engine, domain analysis, and risk scoring...',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: CyberColors.textSecondary, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // Scan Result
+                if (!_isLoading && _scanResult != null)
+                  ResultCard(
+                    scanResult: _scanResult!,
+                    actionLabel: 'Scan Another URL',
+                    onAction: () {
+                      setState(() {
+                        _scanResult = null;
+                        _urlController.clear();
+                      });
+                    },
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );

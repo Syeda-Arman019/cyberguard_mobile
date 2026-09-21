@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
-import '../../models/scan_result.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import '../../core/theme.dart';
+import '../../models/scan_result.dart';
+import 'cyber_components.dart';
 
-/// Reusable card widget to display the complete security scan results.
 class ResultCard extends StatelessWidget {
   final ScanResult scanResult;
   final VoidCallback? onAction;
   final String? actionLabel;
-  final VoidCallback? onDelete; // optional delete callback
+  final VoidCallback? onDelete;
+  final bool isCompact;
 
   const ResultCard({
     super.key,
@@ -15,21 +18,28 @@ class ResultCard extends StatelessWidget {
     this.onAction,
     this.actionLabel,
     this.onDelete,
+    this.isCompact = false,
   });
 
-  /// Maps [RiskLevel] to thematic status colors.
-  Color _getRiskColor(RiskLevel level) {
-    switch (level) {
+  RiskLevel get _effectiveRiskLevel {
+    if (scanResult.threatType == ThreatType.suspiciousDomain &&
+        scanResult.riskLevel == RiskLevel.safe) {
+      return RiskLevel.suspicious;
+    }
+    return scanResult.riskLevel;
+  }
+
+  Color get _riskColor {
+    switch (_effectiveRiskLevel) {
       case RiskLevel.safe:
-        return Colors.green;
+        return CyberColors.safe;
       case RiskLevel.suspicious:
-        return Colors.orange;
+        return CyberColors.suspicious;
       case RiskLevel.malicious:
-        return Colors.red;
+        return CyberColors.malicious;
     }
   }
 
-  /// Converts [ThreatType] into human-readable English text.
   String _formatThreatType(ThreatType type) {
     switch (type) {
       case ThreatType.none:
@@ -45,7 +55,6 @@ class ResultCard extends StatelessWidget {
     }
   }
 
-  /// Converts [ScanSource] into human-readable label.
   String _formatSource(ScanSource source) {
     switch (source) {
       case ScanSource.manual:
@@ -59,138 +68,297 @@ class ResultCard extends StatelessWidget {
     }
   }
 
+  IconData _sourceIcon(ScanSource source) {
+    switch (source) {
+      case ScanSource.manual:
+        return Icons.link;
+      case ScanSource.qr:
+        return Icons.qr_code_scanner;
+      case ScanSource.share:
+        return Icons.share_rounded;
+      case ScanSource.autoProtection:
+        return Icons.shield_rounded;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final displayRiskLevel = scanResult.threatType == ThreatType.suspiciousDomain ? RiskLevel.suspicious : scanResult.riskLevel;
-    final riskColor = _getRiskColor(displayRiskLevel);
+    final color = _riskColor;
+
     return Card(
-      elevation: 2,
+      color: CyberColors.cardBg,
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+          color: color.withAlpha(120),
+          width: 1.5,
+        ),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(18.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Score and Status Badge
+            // Top Row: Risk Score & Risk Badge
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
                       'Risk Score',
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                      style: TextStyle(
+                        fontSize: 12,
+                        letterSpacing: 1.0,
+                        fontWeight: FontWeight.w600,
+                        color: CyberColors.textMuted,
+                      ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       '${scanResult.riskScore}/100',
                       style: TextStyle(
-                        fontSize: 44,
-                        fontWeight: FontWeight.bold,
-                        color: riskColor,
+                        fontSize: 40,
+                        fontWeight: FontWeight.w900,
+                        color: color,
+                        height: 1.1,
                       ),
                     ),
                   ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: riskColor,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    scanResult.riskLevel.name.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
+                RiskBadge(riskLevel: _effectiveRiskLevel),
               ],
             ),
-            const Divider(height: 24),
 
-            // Threat Type & Source Info
+            const SizedBox(height: 12),
+            const Divider(color: CyberColors.border, height: 1),
+            const SizedBox(height: 14),
+
+            // URL Container with Copy button
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: CyberColors.bgDark.withAlpha(180),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: CyberColors.borderSubtle),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.link, color: CyberColors.cyan, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: SelectableText(
+                      'URL: ${scanResult.url}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: CyberColors.textPrimary,
+                        fontFamily: 'monospace',
+                      ),
+                      maxLines: 2,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.copy_rounded, size: 16, color: CyberColors.textMuted),
+                    tooltip: 'Copy URL',
+                    constraints: const BoxConstraints(),
+                    padding: const EdgeInsets.all(4),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: scanResult.url));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('URL copied to clipboard'),
+                          duration: Duration(seconds: 2),
+                          backgroundColor: CyberColors.cardBgElevated,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            // Metadata: Threat Type, Source, Timestamp
             Row(
               children: [
                 const Text(
                   'Threat Type: ',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: CyberColors.textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                Text(_formatThreatType(scanResult.threatType)),
+                Expanded(
+                  child: Text(
+                    _formatThreatType(scanResult.threatType),
+                    style: TextStyle(
+                      color: scanResult.threatType == ThreatType.none
+                          ? CyberColors.safe
+                          : color,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Row(
               children: [
+                Icon(_sourceIcon(scanResult.source), size: 15, color: CyberColors.textMuted),
+                const SizedBox(width: 6),
                 const Text(
                   'Source: ',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: CyberColors.textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                Text(_formatSource(scanResult.source)),
+                Expanded(
+                  child: Text(
+                    _formatSource(scanResult.source),
+                    style: const TextStyle(
+                      color: CyberColors.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 12),
-
-            // Scanned URL
-            Text(
-              'URL: ${scanResult.url}',
-              style: const TextStyle(fontSize: 13, color: Colors.black87),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.access_time_rounded, size: 15, color: CyberColors.textMuted),
+                const SizedBox(width: 6),
+                Text(
+                  DateFormat('dd MMM yyyy, hh:mm a').format(scanResult.timestamp),
+                  style: const TextStyle(
+                    color: CyberColors.textMuted,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
 
-            // Bulleted Reasons
-            const Text(
-              'Reasons:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            ...scanResult.reasons.map(
-              (reason) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2.0),
+            if (!isCompact) ...[
+              // Reasons Section
+              if (scanResult.reasons.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Text(
+                  'Reasons:',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: CyberColors.cyan,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ...scanResult.reasons.map(
+                  (reason) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3.0),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2.0),
+                          child: Icon(
+                            _effectiveRiskLevel == RiskLevel.safe
+                                ? Icons.check_circle_outline
+                                : Icons.error_outline_rounded,
+                            size: 14,
+                            color: color,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            reason,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: CyberColors.textPrimary,
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+
+              // Recommendation Box
+              const SizedBox(height: 16),
+              const Text(
+                'Recommendation:',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: CyberColors.cyan,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14.0),
+                decoration: BoxDecoration(
+                  color: color.withAlpha(25),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: color.withAlpha(80),
+                  ),
+                ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('• ', style: TextStyle(fontWeight: FontWeight.bold)),
-                    Expanded(child: Text(reason)),
+                    Icon(
+                      _effectiveRiskLevel == RiskLevel.safe
+                          ? Icons.verified_user_outlined
+                          : Icons.shield_outlined,
+                      color: color,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        scanResult.recommendation,
+                        style: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
+            ],
 
-            // Recommendation Callout Box
-            const Text(
-              'Recommendation:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12.0),
-              decoration: BoxDecoration(
-                color: riskColor.withAlpha(25),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: riskColor.withAlpha(80)),
-              ),
-              child: Text(
-                scanResult.recommendation,
-                style: TextStyle(
-                  color: riskColor.withAlpha(230),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-
-            // Optional action button (e.g. "Scan Another QR Code")
+            // Action Buttons
             if (onAction != null && actionLabel != null) ...[
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: onAction,
-                  child: Text(actionLabel!),
-                ),
+              const SizedBox(height: 18),
+              PrimaryCyberButton(
+                label: actionLabel!,
+                onPressed: onAction,
+              ),
+            ],
+
+            if (onDelete != null) ...[
+              const SizedBox(height: 10),
+              SecondaryCyberButton(
+                label: 'Delete',
+                icon: Icons.delete_outline_rounded,
+                color: CyberColors.malicious,
+                onPressed: onDelete,
               ),
             ],
           ],

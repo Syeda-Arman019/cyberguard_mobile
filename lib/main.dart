@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'core/theme.dart';
 import 'models/scan_result.dart';
 import 'services/history_service.dart';
-import 'screens/home_screen.dart';
+import 'screens/dashboard_screen.dart';
 import 'screens/share_receive_screen.dart';
 
 /// Global navigator key used by ShareIntentHandler
@@ -35,11 +36,8 @@ class CyberGuardApp extends StatelessWidget {
       title: 'CyberGuard Mobile',
       debugShowCheckedModeBanner: false,
       navigatorKey: _navigatorKey,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
-      home: const HomeScreen(),
+      theme: CyberTheme.darkTheme,
+      home: const DashboardScreen(),
     );
   }
 }

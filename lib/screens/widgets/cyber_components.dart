@@ -1,0 +1,494 @@
+import 'package:flutter/material.dart';
+import '../../core/theme.dart';
+import '../../models/scan_result.dart';
+
+/// Standard rounded CyberGuard container with subtle borders and glow/shadow
+class CyberCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+  final Color? borderColor;
+  final double borderWidth;
+  final Color? backgroundColor;
+  final VoidCallback? onTap;
+
+  const CyberCard({
+    super.key,
+    required this.child,
+    this.padding,
+    this.borderColor,
+    this.borderWidth = 1.0,
+    this.backgroundColor,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveBorderColor = borderColor ?? CyberColors.border;
+    final cardContent = Container(
+      width: double.infinity,
+      padding: padding ?? const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: backgroundColor ?? CyberColors.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: effectiveBorderColor, width: borderWidth),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(77),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+          if (borderColor != null)
+            BoxShadow(
+              color: effectiveBorderColor.withAlpha(20),
+              blurRadius: 14,
+              spreadRadius: 1,
+            ),
+        ],
+      ),
+      child: child,
+    );
+
+    if (onTap != null) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: cardContent,
+        ),
+      );
+    }
+
+    return cardContent;
+  }
+}
+
+/// Visual protection status badge
+class SecurityStatusBadge extends StatelessWidget {
+  final String label;
+  final bool isProtected;
+
+  const SecurityStatusBadge({
+    super.key,
+    this.label = 'Protection ON',
+    this.isProtected = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isProtected ? CyberColors.safe : CyberColors.suspicious;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withAlpha(30),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withAlpha(102), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color,
+              boxShadow: [
+                BoxShadow(
+                  color: color.withAlpha(204),
+                  blurRadius: 4,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Visual risk badge for Safe, Suspicious, and Malicious
+class RiskBadge extends StatelessWidget {
+  final RiskLevel riskLevel;
+  final bool isSmall;
+
+  const RiskBadge({
+    super.key,
+    required this.riskLevel,
+    this.isSmall = false,
+  });
+
+  Color get color {
+    switch (riskLevel) {
+      case RiskLevel.safe:
+        return CyberColors.safe;
+      case RiskLevel.suspicious:
+        return CyberColors.suspicious;
+      case RiskLevel.malicious:
+        return CyberColors.malicious;
+    }
+  }
+
+  String get label {
+    switch (riskLevel) {
+      case RiskLevel.safe:
+        return 'SAFE';
+      case RiskLevel.suspicious:
+        return 'SUSPICIOUS';
+      case RiskLevel.malicious:
+        return 'MALICIOUS';
+    }
+  }
+
+  IconData get icon {
+    switch (riskLevel) {
+      case RiskLevel.safe:
+        return Icons.check_circle_rounded;
+      case RiskLevel.suspicious:
+        return Icons.warning_rounded;
+      case RiskLevel.malicious:
+        return Icons.dangerous_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isSmall ? 8 : 12,
+        vertical: isSmall ? 4 : 6,
+      ),
+      decoration: BoxDecoration(
+        color: color.withAlpha(38),
+        borderRadius: BorderRadius.circular(isSmall ? 10 : 14),
+        border: Border.all(color: color.withAlpha(128), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: isSmall ? 13 : 16, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: isSmall ? 11 : 12.5,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Primary Cyber button with cyan background and glow
+class PrimaryCyberButton extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final VoidCallback? onPressed;
+  final bool isLoading;
+
+  const PrimaryCyberButton({
+    super.key,
+    required this.label,
+    this.icon,
+    this.onPressed,
+    this.isLoading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: CyberColors.cyan,
+          foregroundColor: CyberColors.bgDark,
+          disabledBackgroundColor: CyberColors.cyan.withAlpha(77),
+          disabledForegroundColor: CyberColors.bgDark.withAlpha(153),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          elevation: 4,
+          shadowColor: CyberColors.cyan.withAlpha(102),
+        ),
+        onPressed: isLoading ? null : onPressed,
+        child: isLoading
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(CyberColors.bgDark),
+                ),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 20),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+/// Secondary Cyber button with cyan or neutral outline
+class SecondaryCyberButton extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final VoidCallback? onPressed;
+  final Color? color;
+
+  const SecondaryCyberButton({
+    super.key,
+    required this.label,
+    this.icon,
+    this.onPressed,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveColor = color ?? CyberColors.cyan;
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: OutlinedButton(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: effectiveColor,
+          side: BorderSide(color: effectiveColor.withAlpha(153), width: 1.2),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        onPressed: onPressed,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 18),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Section header with cyber styling
+class SectionHeader extends StatelessWidget {
+  final String title;
+  final Widget? trailing;
+
+  const SectionHeader({
+    super.key,
+    required this.title,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 3.5,
+              height: 14,
+              decoration: BoxDecoration(
+                color: CyberColors.cyan,
+                borderRadius: BorderRadius.circular(2),
+                boxShadow: [
+                  BoxShadow(
+                    color: CyberColors.cyan.withAlpha(153),
+                    blurRadius: 4,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              title.toUpperCase(),
+              style: const TextStyle(
+                color: CyberColors.cyan,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.5,
+              ),
+            ),
+          ],
+        ),
+        if (trailing != null) trailing!,
+      ],
+    );
+  }
+}
+
+/// Polished empty state widget
+class CyberEmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String description;
+  final Widget? action;
+
+  const CyberEmptyState({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.description,
+    this.action,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: CyberColors.cardBg,
+                border: Border.all(color: CyberColors.border, width: 1.5),
+              ),
+              child: Icon(
+                icon,
+                size: 36,
+                color: CyberColors.textMuted.withAlpha(178),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(
+                color: CyberColors.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              description,
+              style: const TextStyle(
+                color: CyberColors.textSecondary,
+                fontSize: 13,
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            if (action != null) ...[
+              const SizedBox(height: 20),
+              action!,
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Statistics tile
+class ScanStatCard extends StatelessWidget {
+  final String label;
+  final int value;
+  final IconData icon;
+  final Color color;
+
+  const ScanStatCard({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: CyberColors.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withAlpha(71), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: color.withAlpha(15),
+            blurRadius: 10,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Text(
+            '$value',
+            style: TextStyle(
+              color: color,
+              fontSize: 30,
+              fontWeight: FontWeight.bold,
+              height: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

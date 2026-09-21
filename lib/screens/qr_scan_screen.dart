@@ -1,10 +1,11 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../core/theme.dart';
 import '../models/scan_result.dart';
 import '../services/history_service.dart';
 import '../services/risk_engine.dart';
 import 'widgets/result_card.dart';
+import 'widgets/cyber_components.dart';
 
 /// Screen that opens camera to scan a QR code, extracts its URL,
 /// and executes automated risk analysis.
@@ -24,6 +25,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
   bool _isAnalyzing = false;
   ScanResult? _scanResult;
   String? _scannedUrl;
+  bool _isTorchOn = false;
 
   @override
   void initState() {
@@ -44,7 +46,6 @@ class _QrScanScreenState extends State<QrScanScreen> {
 
   /// Handles barcode detection event.
   void _onBarcodeDetected(BarcodeCapture capture) async {
-    // Prevent duplicate scans while analysis is active or result is shown
     if (_isAnalyzing || _scanResult != null) return;
 
     final barcodes = capture.barcodes;
@@ -60,7 +61,6 @@ class _QrScanScreenState extends State<QrScanScreen> {
       _scannedUrl = url;
     });
 
-    // Pause camera stream while analyzing
     await _scannerController.stop();
 
     ScanResult? result;
@@ -79,7 +79,6 @@ class _QrScanScreenState extends State<QrScanScreen> {
     }
   }
 
-  /// Resets scan state to allow scanning another QR code.
   void _restartScan() async {
     setState(() {
       _scanResult = null;
@@ -94,20 +93,35 @@ class _QrScanScreenState extends State<QrScanScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('QR Code Scanner'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_rounded, color: CyberColors.cyan),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.flash_on),
+            icon: Icon(
+              _isTorchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+              color: _isTorchOn ? CyberColors.cyan : CyberColors.textSecondary,
+            ),
             tooltip: 'Toggle Flashlight',
-            onPressed: () => _scannerController.toggleTorch(),
+            onPressed: () {
+              _scannerController.toggleTorch();
+              setState(() => _isTorchOn = !_isTorchOn);
+            },
           ),
           IconButton(
-            icon: const Icon(Icons.flip_camera_android),
+            icon: const Icon(Icons.flip_camera_android_rounded, color: CyberColors.cyan),
             tooltip: 'Switch Camera',
             onPressed: () => _scannerController.switchCamera(),
           ),
         ],
       ),
-      body: _buildBody(),
+      body: Container(
+        decoration: const BoxDecoration(gradient: CyberColors.backgroundGradient),
+        child: SafeArea(
+          child: _buildBody(),
+        ),
+      ),
     );
   }
 
@@ -131,26 +145,44 @@ class _QrScanScreenState extends State<QrScanScreen> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 16),
-              const Text(
-                'Analyzing Scanned QR Code...',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              if (_scannedUrl != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  _scannedUrl!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 13, color: Colors.grey),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+          child: CyberCard(
+            padding: const EdgeInsets.all(28.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    valueColor: AlwaysStoppedAnimation<Color>(CyberColors.cyan),
+                  ),
                 ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Analyzing QR Link...',
+                  style: TextStyle(
+                    color: CyberColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (_scannedUrl != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    _scannedUrl!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: CyberColors.cyan,
+                      fontFamily: 'monospace',
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       );
@@ -165,20 +197,113 @@ class _QrScanScreenState extends State<QrScanScreen> {
             return _buildPermissionError(error);
           },
         ),
+
+        // Cyber Scanner Targeting Overlay
+        Center(
+          child: Container(
+            width: 250,
+            height: 250,
+            decoration: BoxDecoration(
+              border: Border.all(color: CyberColors.cyan.withAlpha(160), width: 1.5),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Stack(
+              children: [
+                // 4 glowing corners
+                Align(
+                  alignment: Alignment.topLeft,
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        top: BorderSide(color: CyberColors.cyan, width: 3.5),
+                        left: BorderSide(color: CyberColors.cyan, width: 3.5),
+                      ),
+                      borderRadius: BorderRadius.only(topLeft: Radius.circular(20)),
+                    ),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.topRight,
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        top: BorderSide(color: CyberColors.cyan, width: 3.5),
+                        right: BorderSide(color: CyberColors.cyan, width: 3.5),
+                      ),
+                      borderRadius: BorderRadius.only(topRight: Radius.circular(20)),
+                    ),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.bottomLeft,
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: CyberColors.cyan, width: 3.5),
+                        left: BorderSide(color: CyberColors.cyan, width: 3.5),
+                      ),
+                      borderRadius: BorderRadius.only(bottomLeft: Radius.circular(20)),
+                    ),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.bottomRight,
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: CyberColors.cyan, width: 3.5),
+                        right: BorderSide(color: CyberColors.cyan, width: 3.5),
+                      ),
+                      borderRadius: BorderRadius.only(bottomRight: Radius.circular(20)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Instruction Pill
         Positioned(
           bottom: 36,
-          left: 16,
-          right: 16,
+          left: 20,
+          right: 20,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.black.withAlpha(180),
-              borderRadius: BorderRadius.circular(8),
+              color: CyberColors.bgDark.withAlpha(220),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: CyberColors.border),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(120),
+                  blurRadius: 10,
+                ),
+              ],
             ),
-            child: const Text(
-              'Align QR code within camera frame to scan',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white, fontSize: 14),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.qr_code_scanner_rounded, color: CyberColors.cyan, size: 18),
+                SizedBox(width: 8),
+                Text(
+                  'Align QR code inside target frame',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: CyberColors.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -186,41 +311,42 @@ class _QrScanScreenState extends State<QrScanScreen> {
     );
   }
 
-  /// Builds a friendly user interface if camera permission is denied or camera fails.
   Widget _buildPermissionError(MobileScannerException error) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.no_photography_outlined,
-                  size: 56,
-                  color: Colors.orange,
+        child: CyberCard(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.no_photography_outlined,
+                size: 52,
+                color: CyberColors.suspicious,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Camera Access Required',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: CyberColors.textPrimary,
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Camera Permission Required',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'CyberGuard requires camera access to scan QR codes for malicious links and phishing attacks.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: Colors.black87),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () => _scannerController.start(),
-                  icon: const Icon(Icons.camera_alt),
-                  label: const Text('Grant Camera Access'),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'CyberGuard requires camera access to scan physical QR codes for phishing links and malicious URLs.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: CyberColors.textSecondary),
+              ),
+              const SizedBox(height: 20),
+              PrimaryCyberButton(
+                onPressed: () => _scannerController.start(),
+                icon: Icons.camera_alt_rounded,
+                label: 'Enable Camera',
+              ),
+            ],
           ),
         ),
       ),
