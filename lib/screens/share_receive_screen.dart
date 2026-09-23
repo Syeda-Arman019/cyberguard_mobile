@@ -1,12 +1,9 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
-import 'package:vibration/vibration.dart';
 import '../core/theme.dart';
 import '../models/scan_result.dart';
 import '../services/risk_engine.dart';
-import '../services/siren_service.dart';
+import '../services/scan_alert_service.dart';
 import 'widgets/result_card.dart';
 import 'widgets/cyber_components.dart';
 import '../services/history_service.dart';
@@ -58,8 +55,8 @@ class _ShareReceiveScreenState extends State<ShareReceiveScreen> {
     final match = _urlRegex.firstMatch(text.trim());
 
     if (match == null) {
-      // No URL found — make sure no siren keeps ringing.
-      await SirenService.instance.stop();
+      // No URL found — make sure no alert keeps running.
+      await ScanAlertService.instance.stopSounds();
       if (mounted) {
         setState(() {
           _isAnalyzing = false;
@@ -80,48 +77,31 @@ class _ShareReceiveScreenState extends State<ShareReceiveScreen> {
 
     final result = await _engine.analyzeUrl(url, ScanSource.share);
     await HistoryService.instance.saveScan(result);
-    await _handleResultAlert(result);
 
     if (mounted) {
+      // Show the result immediately; alerts run in parallel afterwards.
       setState(() {
         _result = result;
         _isAnalyzing = false;
       });
+      // Shared alert flow: siren + vibration + persistent notification for
+      // risky results; all stopped/cancelled for safe results.
+      await ScanAlertService.instance.handleResult(result);
     }
   }
 
-  /// Starts the looping siren + vibration for risky results, or stops any
-  /// active siren for safe results. Uses the shared SirenService.
-  Future<void> _handleResultAlert(ScanResult result) async {
-    final bool isRisky = result.riskLevel == RiskLevel.suspicious ||
-        result.riskLevel == RiskLevel.malicious;
-    if (!isRisky) {
-      await SirenService.instance.stop();
-      return;
-    }
-    // start() is guarded, so repeated calls never duplicate playback.
-    unawaited(SirenService.instance.start());
-    try {
-      final canVibrate = await Vibration.hasVibrator();
-      if (canVibrate) {
-        await Vibration.vibrate(pattern: [0, 400, 200, 400, 200, 400]);
-      }
-    } catch (_) {
-      // Vibration not supported on this device.
-    }
-  }
-
-  /// Stops the audible warning when the user acknowledges it.
+  /// Stops the audible warning + danger notification when the user
+  /// acknowledges the result.
   Future<void> _silenceAlert() async {
-    await SirenService.instance.stop();
+    await ScanAlertService.instance.acknowledge();
     if (!mounted) return;
     setState(() => _alertSilenced = true);
   }
 
   @override
   void dispose() {
-    // Never leave the siren ringing after leaving the screen.
-    SirenService.instance.stop();
+    // Never leave the siren/vibration running after leaving the screen.
+    ScanAlertService.instance.stopSounds();
     super.dispose();
   }
 

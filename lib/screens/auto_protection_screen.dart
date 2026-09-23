@@ -1,13 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import '../services/risk_engine.dart';
 import '../services/history_service.dart';
-import '../services/siren_service.dart';
+import '../services/scan_alert_service.dart';
 import '../models/scan_result.dart';
 import 'widgets/result_card.dart';
 import '../core/theme.dart';
-import 'package:vibration/vibration.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -24,7 +21,6 @@ class _AutoProtectionScreenState extends State<AutoProtectionScreen> {
   bool _isLoading = false;
   bool _childSafeMode = false;
   bool _protectionEnabled = true;
-  bool _securityNotifications = true;
   bool _alertSilenced = false;
 
   @override
@@ -50,7 +46,6 @@ class _AutoProtectionScreenState extends State<AutoProtectionScreen> {
       setState(() {
         _childSafeMode = prefs.getBool('child_safe_mode') ?? false;
         _protectionEnabled = prefs.getBool('protection_mode_enabled') ?? true;
-        _securityNotifications = prefs.getBool('security_notifications') ?? true;
       });
     } catch (_) {
       // Keep defaults if preferences are unavailable.
@@ -67,54 +62,68 @@ class _AutoProtectionScreenState extends State<AutoProtectionScreen> {
       final result = await engine.analyzeUrl(url, ScanSource.autoProtection);
       await HistoryService.instance.saveScan(result);
 
-      final bool isRisky = result.riskLevel == RiskLevel.suspicious ||
-          result.riskLevel == RiskLevel.malicious;
-
-      // Alert only when Protection Mode is on and the user allows
-      // security notifications for risky URLs.
-      if (_protectionEnabled && _securityNotifications && isRisky) {
-        // Loud, looping siren until the user acknowledges the warning.
-        unawaited(SirenService.instance.start());
-        final canVibrate = await Vibration.hasVibrator();
-        if (canVibrate) {
-          await Vibration.vibrate(pattern: [0, 400, 200, 400, 200, 400]);
-        }
-      } else {
-        // Make sure no previous siren keeps sounding on safe results.
-        await SirenService.instance.stop();
-      }
-
       if (mounted) {
+        // Show the result immediately; alerts run in parallel afterwards.
         setState(() {
           _result = result;
           _isLoading = false;
         });
+      }
+
+      // Protection Mode decides whether anything alerts at all. The shared
+      // service then starts the siren + vibration for risky results — the
+      // siren NEVER depends on security_notifications — and shows the
+      // persistent system notification only when that setting allows it.
+      // Safe results and Protection Mode off stop all sounds and clear any
+      // previously posted danger notification.
+      if (!_protectionEnabled) {
+        await ScanAlertService.instance.stopSounds();
+        await ScanAlertService.instance.cancelDangerNotification();
+      } else {
+        await ScanAlertService.instance.handleResult(result);
       }
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  /// Stops the audible warning when the user acknowledges it.
+  /// Stops the audible warning + danger notification when the user
+  /// acknowledges the result.
   Future<void> _silenceAlert() async {
-    await SirenService.instance.stop();
+    await ScanAlertService.instance.acknowledge();
     if (!mounted) return;
     setState(() => _alertSilenced = true);
   }
 
   @override
   void dispose() {
-    // Never leave the siren ringing after leaving the screen.
-    SirenService.instance.stop();
+    // Never leave the siren/vibration running after leaving the screen.
+    ScanAlertService.instance.stopSounds();
     super.dispose();
   }
 
-  Future<void> _openUrl() async {
+  /// Stops siren, vibration and the danger notification, then hands the URL
+  /// to the user's normal external browser via an explicit launch.
+  /// CyberGuard never positions itself as the browser and never auto-opens
+  /// risky links.
+  Future<void> _openInExternalBrowser() async {
+    await ScanAlertService.instance.acknowledge();
     if (_result == null) return;
     final uri = Uri.tryParse(_result!.url);
     if (uri == null) return;
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      // No external browser available to handle the link.
+    }
+  }
+
+  /// Stops siren, vibration and the danger notification, then leaves the
+  /// warning screen.
+  Future<void> _goBack() async {
+    await ScanAlertService.instance.acknowledge();
+    if (mounted && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
     }
   }
 
@@ -171,10 +180,12 @@ class _AutoProtectionScreenState extends State<AutoProtectionScreen> {
 
     if (_result!.riskLevel == RiskLevel.safe) {
       actions.add(ElevatedButton(
-        onPressed: _openUrl,
+        onPressed: _openInExternalBrowser,
         child: const Text('Continue to Browser'),
       ));
-    } else if (_result!.riskLevel == RiskLevel.malicious && _childSafeMode) {
+    } else if (isRisky && _childSafeMode) {
+      // Child Safe Mode: suspicious AND malicious links are blocked outright.
+      // The URL is never handed to a browser from this screen.
       actions.add(Container(
         width: double.infinity,
         color: Colors.redAccent,
@@ -187,18 +198,20 @@ class _AutoProtectionScreenState extends State<AutoProtectionScreen> {
       ));
       actions.add(const SizedBox(height: 8));
       actions.add(ElevatedButton(
-        onPressed: () => Navigator.of(context).pop(),
-        child: const Text('Go Back'),
+        onPressed: _goBack,
+        child: const Text('GO BACK'),
       ));
     } else {
+      // Normal mode: explicit user decision required — the dangerous URL is
+      // only opened after the user presses OPEN ANYWAY.
       actions.add(ElevatedButton(
-        onPressed: _openUrl,
-        child: const Text('Open Anyway'),
+        onPressed: _goBack,
+        child: const Text('GO BACK'),
       ));
       actions.add(const SizedBox(height: 8));
       actions.add(ElevatedButton(
-        onPressed: () => Navigator.of(context).pop(),
-        child: const Text('Go Back'),
+        onPressed: _openInExternalBrowser,
+        child: const Text('OPEN ANYWAY'),
       ));
     }
     return Column(

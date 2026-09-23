@@ -1,14 +1,11 @@
 // lib/screens/manual_scan_screen.dart
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:vibration/vibration.dart';
 import '../core/theme.dart';
 import '../models/scan_result.dart';
 import '../services/risk_engine.dart';
 import '../services/history_service.dart';
-import '../services/siren_service.dart';
+import '../services/scan_alert_service.dart';
 import 'widgets/result_card.dart';
 
 class ManualScanScreen extends StatefulWidget {
@@ -35,8 +32,8 @@ class _ManualScanScreenState extends State<ManualScanScreen> {
 
   @override
   void dispose() {
-    // Never leave the siren ringing after leaving the screen.
-    SirenService.instance.stop();
+    // Never leave the siren/vibration running after leaving the screen.
+    ScanAlertService.instance.stopSounds();
     _urlController.dispose();
     super.dispose();
   }
@@ -46,30 +43,10 @@ class _ManualScanScreenState extends State<ManualScanScreen> {
       (_scanResult!.riskLevel == RiskLevel.suspicious ||
           _scanResult!.riskLevel == RiskLevel.malicious);
 
-  /// Starts the looping siren + vibration for risky results, or stops any
-  /// active siren for safe results. Uses the shared SirenService.
-  Future<void> _handleResultAlert(ScanResult result) async {
-    final bool isRisky = result.riskLevel == RiskLevel.suspicious ||
-        result.riskLevel == RiskLevel.malicious;
-    if (!isRisky) {
-      await SirenService.instance.stop();
-      return;
-    }
-    // start() is guarded, so repeated calls never duplicate playback.
-    unawaited(SirenService.instance.start());
-    try {
-      final canVibrate = await Vibration.hasVibrator();
-      if (canVibrate) {
-        await Vibration.vibrate(pattern: [0, 400, 200, 400, 200, 400]);
-      }
-    } catch (_) {
-      // Vibration not supported on this device.
-    }
-  }
-
-  /// Stops the audible warning when the user acknowledges it.
+  /// Stops the audible warning + danger notification when the user
+  /// acknowledges the result.
   Future<void> _silenceAlert() async {
-    await SirenService.instance.stop();
+    await ScanAlertService.instance.acknowledge();
     if (!mounted) return;
     setState(() => _alertSilenced = true);
   }
@@ -95,16 +72,19 @@ class _ManualScanScreenState extends State<ManualScanScreen> {
       _alertSilenced = false; // New scan resets the alert state.
     });
     // A new analysis must not have a previous siren ringing over it.
-    await SirenService.instance.stop();
+    await ScanAlertService.instance.stopSounds();
 
     try {
       final result = await _engine.analyzeUrl(rawUrl, ScanSource.manual);
-      await _handleResultAlert(result);
       if (!mounted) return;
+      // Show the result immediately; alerts run in parallel afterwards.
       setState(() {
         _scanResult = result;
         _isLoading = false;
       });
+      // Shared alert flow: siren + vibration + persistent notification for
+      // risky results; all stopped/cancelled for safe results.
+      await ScanAlertService.instance.handleResult(result);
       // Save to history
       await HistoryService.instance.saveScan(result);
     } catch (e) {
@@ -333,7 +313,7 @@ class _ManualScanScreenState extends State<ManualScanScreen> {
                     scanResult: _scanResult!,
                     actionLabel: 'Scan Another URL',
                     onAction: () {
-                      SirenService.instance.stop();
+                      ScanAlertService.instance.acknowledge();
                       setState(() {
                         _scanResult = null;
                         _urlController.clear();

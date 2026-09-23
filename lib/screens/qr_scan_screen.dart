@@ -1,13 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:vibration/vibration.dart';
 import '../core/theme.dart';
 import '../models/scan_result.dart';
 import '../services/history_service.dart';
 import '../services/risk_engine.dart';
-import '../services/siren_service.dart';
+import '../services/scan_alert_service.dart';
 import 'widgets/result_card.dart';
 import 'widgets/cyber_components.dart';
 
@@ -45,36 +42,16 @@ class _QrScanScreenState extends State<QrScanScreen> {
 
   @override
   void dispose() {
-    // Never leave the siren ringing after leaving the screen.
-    SirenService.instance.stop();
+    // Never leave the siren/vibration running after leaving the screen.
+    ScanAlertService.instance.stopSounds();
     _scannerController.dispose();
     super.dispose();
   }
 
-  /// Starts the looping siren + vibration for risky results, or stops any
-  /// active siren for safe results. Uses the shared SirenService.
-  Future<void> _handleResultAlert(ScanResult result) async {
-    final bool isRisky = result.riskLevel == RiskLevel.suspicious ||
-        result.riskLevel == RiskLevel.malicious;
-    if (!isRisky) {
-      await SirenService.instance.stop();
-      return;
-    }
-    // start() is guarded, so repeated calls never duplicate playback.
-    unawaited(SirenService.instance.start());
-    try {
-      final canVibrate = await Vibration.hasVibrator();
-      if (canVibrate) {
-        await Vibration.vibrate(pattern: [0, 400, 200, 400, 200, 400]);
-      }
-    } catch (_) {
-      // Vibration not supported on this device.
-    }
-  }
-
-  /// Stops the audible warning when the user acknowledges it.
+  /// Stops the audible warning + danger notification when the user
+  /// acknowledges the result.
   Future<void> _silenceAlert() async {
-    await SirenService.instance.stop();
+    await ScanAlertService.instance.acknowledge();
     if (!mounted) return;
     setState(() => _alertSilenced = true);
   }
@@ -105,13 +82,17 @@ class _QrScanScreenState extends State<QrScanScreen> {
     } catch (e) {
       debugPrint('QR analysis error: $e');
     } finally {
-      // Alert on the final result (null result = failed analysis, no alert).
-      if (result != null) {
-        await _handleResultAlert(result);
-      }
-      if (mounted) {
+      if (mounted && result != null) {
+        // Show the result immediately; alerts run in parallel afterwards.
         setState(() {
           _scanResult = result;
+          _isAnalyzing = false;
+        });
+        // Shared alert flow: siren + vibration + persistent notification
+        // for risky results; all stopped/cancelled for safe results.
+        await ScanAlertService.instance.handleResult(result);
+      } else if (mounted) {
+        setState(() {
           _isAnalyzing = false;
         });
       }
@@ -120,7 +101,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
 
   void _restartScan() async {
     // A new scan resets the alert state and stops any ringing siren.
-    SirenService.instance.stop();
+    ScanAlertService.instance.stopSounds();
     setState(() {
       _scanResult = null;
       _scannedUrl = null;
