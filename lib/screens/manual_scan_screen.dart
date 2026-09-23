@@ -1,10 +1,14 @@
 // lib/screens/manual_scan_screen.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vibration/vibration.dart';
 import '../core/theme.dart';
 import '../models/scan_result.dart';
 import '../services/risk_engine.dart';
 import '../services/history_service.dart';
+import '../services/siren_service.dart';
 import 'widgets/result_card.dart';
 
 class ManualScanScreen extends StatefulWidget {
@@ -20,6 +24,7 @@ class _ManualScanScreenState extends State<ManualScanScreen> {
   bool _isLoading = false;
   ScanResult? _scanResult;
   String? _inputError;
+  bool _alertSilenced = false;
   late final RiskEngine _engine;
 
   @override
@@ -30,8 +35,43 @@ class _ManualScanScreenState extends State<ManualScanScreen> {
 
   @override
   void dispose() {
+    // Never leave the siren ringing after leaving the screen.
+    SirenService.instance.stop();
     _urlController.dispose();
     super.dispose();
+  }
+
+  bool get _isRiskyResult =>
+      _scanResult != null &&
+      (_scanResult!.riskLevel == RiskLevel.suspicious ||
+          _scanResult!.riskLevel == RiskLevel.malicious);
+
+  /// Starts the looping siren + vibration for risky results, or stops any
+  /// active siren for safe results. Uses the shared SirenService.
+  Future<void> _handleResultAlert(ScanResult result) async {
+    final bool isRisky = result.riskLevel == RiskLevel.suspicious ||
+        result.riskLevel == RiskLevel.malicious;
+    if (!isRisky) {
+      await SirenService.instance.stop();
+      return;
+    }
+    // start() is guarded, so repeated calls never duplicate playback.
+    unawaited(SirenService.instance.start());
+    try {
+      final canVibrate = await Vibration.hasVibrator();
+      if (canVibrate) {
+        await Vibration.vibrate(pattern: [0, 400, 200, 400, 200, 400]);
+      }
+    } catch (_) {
+      // Vibration not supported on this device.
+    }
+  }
+
+  /// Stops the audible warning when the user acknowledges it.
+  Future<void> _silenceAlert() async {
+    await SirenService.instance.stop();
+    if (!mounted) return;
+    setState(() => _alertSilenced = true);
   }
 
   Future<void> _pasteFromClipboard() async {
@@ -52,10 +92,14 @@ class _ManualScanScreenState extends State<ManualScanScreen> {
     setState(() {
       _isLoading = true;
       _inputError = null;
+      _alertSilenced = false; // New scan resets the alert state.
     });
+    // A new analysis must not have a previous siren ringing over it.
+    await SirenService.instance.stop();
 
     try {
       final result = await _engine.analyzeUrl(rawUrl, ScanSource.manual);
+      await _handleResultAlert(result);
       if (!mounted) return;
       setState(() {
         _scanResult = result;
@@ -264,17 +308,39 @@ class _ManualScanScreenState extends State<ManualScanScreen> {
                   ),
 
                 // Scan Result
-                if (!_isLoading && _scanResult != null)
+                if (!_isLoading && _scanResult != null) ...[
+                  // Silence control for the looping siren on risky results.
+                  if (_isRiskyResult && !_alertSilenced) ...[
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(220, 48),
+                      ),
+                      onPressed: _silenceAlert,
+                      icon: const Icon(Icons.volume_off_rounded),
+                      label: const Text(
+                        'SILENCE ALERT',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   ResultCard(
                     scanResult: _scanResult!,
                     actionLabel: 'Scan Another URL',
                     onAction: () {
+                      SirenService.instance.stop();
                       setState(() {
                         _scanResult = null;
                         _urlController.clear();
                       });
                     },
                   ),
+                ],
               ],
             ),
           ),

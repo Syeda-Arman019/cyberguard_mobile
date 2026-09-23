@@ -27,6 +27,9 @@ class SirenService {
     try {
       // Release any finished/previous session first.
       await _player.release();
+      // If stop() was called while we were initializing, abort so audio can
+      // never start after the user (or dispose) silenced the alert.
+      if (!_isPlaying) return;
       // Low volume on the audio mix still respects the media stream, so the
       // alarm is audible at normal media volume on a physical device.
       await _player.setReleaseMode(ReleaseMode.loop);

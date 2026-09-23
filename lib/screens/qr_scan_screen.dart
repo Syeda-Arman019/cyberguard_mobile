@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:vibration/vibration.dart';
 import '../core/theme.dart';
 import '../models/scan_result.dart';
 import '../services/history_service.dart';
 import '../services/risk_engine.dart';
+import '../services/siren_service.dart';
 import 'widgets/result_card.dart';
 import 'widgets/cyber_components.dart';
 
@@ -26,6 +30,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
   ScanResult? _scanResult;
   String? _scannedUrl;
   bool _isTorchOn = false;
+  bool _alertSilenced = false;
 
   @override
   void initState() {
@@ -40,8 +45,38 @@ class _QrScanScreenState extends State<QrScanScreen> {
 
   @override
   void dispose() {
+    // Never leave the siren ringing after leaving the screen.
+    SirenService.instance.stop();
     _scannerController.dispose();
     super.dispose();
+  }
+
+  /// Starts the looping siren + vibration for risky results, or stops any
+  /// active siren for safe results. Uses the shared SirenService.
+  Future<void> _handleResultAlert(ScanResult result) async {
+    final bool isRisky = result.riskLevel == RiskLevel.suspicious ||
+        result.riskLevel == RiskLevel.malicious;
+    if (!isRisky) {
+      await SirenService.instance.stop();
+      return;
+    }
+    // start() is guarded, so repeated calls never duplicate playback.
+    unawaited(SirenService.instance.start());
+    try {
+      final canVibrate = await Vibration.hasVibrator();
+      if (canVibrate) {
+        await Vibration.vibrate(pattern: [0, 400, 200, 400, 200, 400]);
+      }
+    } catch (_) {
+      // Vibration not supported on this device.
+    }
+  }
+
+  /// Stops the audible warning when the user acknowledges it.
+  Future<void> _silenceAlert() async {
+    await SirenService.instance.stop();
+    if (!mounted) return;
+    setState(() => _alertSilenced = true);
   }
 
   /// Handles barcode detection event.
@@ -70,6 +105,10 @@ class _QrScanScreenState extends State<QrScanScreen> {
     } catch (e) {
       debugPrint('QR analysis error: $e');
     } finally {
+      // Alert on the final result (null result = failed analysis, no alert).
+      if (result != null) {
+        await _handleResultAlert(result);
+      }
       if (mounted) {
         setState(() {
           _scanResult = result;
@@ -80,10 +119,13 @@ class _QrScanScreenState extends State<QrScanScreen> {
   }
 
   void _restartScan() async {
+    // A new scan resets the alert state and stops any ringing siren.
+    SirenService.instance.stop();
     setState(() {
       _scanResult = null;
       _scannedUrl = null;
       _isAnalyzing = false;
+      _alertSilenced = false;
     });
     await _scannerController.start();
   }
@@ -127,10 +169,32 @@ class _QrScanScreenState extends State<QrScanScreen> {
 
   Widget _buildBody() {
     if (_scanResult != null) {
+      final bool isRisky = _scanResult!.riskLevel == RiskLevel.suspicious ||
+          _scanResult!.riskLevel == RiskLevel.malicious;
       return SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            // Silence control for the looping siren on risky results.
+            if (isRisky && !_alertSilenced) ...[
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(220, 48),
+                ),
+                onPressed: _silenceAlert,
+                icon: const Icon(Icons.volume_off_rounded),
+                label: const Text(
+                  'SILENCE ALERT',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             ResultCard(
               scanResult: _scanResult!,
               onAction: _restartScan,

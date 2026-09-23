@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
+import 'package:vibration/vibration.dart';
 import '../core/theme.dart';
 import '../models/scan_result.dart';
 import '../services/risk_engine.dart';
+import '../services/siren_service.dart';
 import 'widgets/result_card.dart';
 import 'widgets/cyber_components.dart';
 import '../services/history_service.dart';
@@ -36,6 +40,7 @@ class _ShareReceiveScreenState extends State<ShareReceiveScreen> {
   ScanResult? _result;
   String? _extractedUrl;
   String? _errorMessage;
+  bool _alertSilenced = false;
 
   static final _urlRegex = RegExp(
     r'https?://[^\s\]"<>]+',
@@ -53,6 +58,8 @@ class _ShareReceiveScreenState extends State<ShareReceiveScreen> {
     final match = _urlRegex.firstMatch(text.trim());
 
     if (match == null) {
+      // No URL found — make sure no siren keeps ringing.
+      await SirenService.instance.stop();
       if (mounted) {
         setState(() {
           _isAnalyzing = false;
@@ -73,6 +80,7 @@ class _ShareReceiveScreenState extends State<ShareReceiveScreen> {
 
     final result = await _engine.analyzeUrl(url, ScanSource.share);
     await HistoryService.instance.saveScan(result);
+    await _handleResultAlert(result);
 
     if (mounted) {
       setState(() {
@@ -80,6 +88,41 @@ class _ShareReceiveScreenState extends State<ShareReceiveScreen> {
         _isAnalyzing = false;
       });
     }
+  }
+
+  /// Starts the looping siren + vibration for risky results, or stops any
+  /// active siren for safe results. Uses the shared SirenService.
+  Future<void> _handleResultAlert(ScanResult result) async {
+    final bool isRisky = result.riskLevel == RiskLevel.suspicious ||
+        result.riskLevel == RiskLevel.malicious;
+    if (!isRisky) {
+      await SirenService.instance.stop();
+      return;
+    }
+    // start() is guarded, so repeated calls never duplicate playback.
+    unawaited(SirenService.instance.start());
+    try {
+      final canVibrate = await Vibration.hasVibrator();
+      if (canVibrate) {
+        await Vibration.vibrate(pattern: [0, 400, 200, 400, 200, 400]);
+      }
+    } catch (_) {
+      // Vibration not supported on this device.
+    }
+  }
+
+  /// Stops the audible warning when the user acknowledges it.
+  Future<void> _silenceAlert() async {
+    await SirenService.instance.stop();
+    if (!mounted) return;
+    setState(() => _alertSilenced = true);
+  }
+
+  @override
+  void dispose() {
+    // Never leave the siren ringing after leaving the screen.
+    SirenService.instance.stop();
+    super.dispose();
   }
 
   void _dismiss() => Navigator.of(context).pop();
@@ -214,8 +257,30 @@ class _ShareReceiveScreenState extends State<ShareReceiveScreen> {
 
     // 3. Result card
     if (_result != null) {
+      final bool isRisky = _result!.riskLevel == RiskLevel.suspicious ||
+          _result!.riskLevel == RiskLevel.malicious;
       return Column(
         children: [
+          // Silence control for the looping siren on risky results.
+          if (isRisky && !_alertSilenced) ...[
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(220, 48),
+              ),
+              onPressed: _silenceAlert,
+              icon: const Icon(Icons.volume_off_rounded),
+              label: const Text(
+                'SILENCE ALERT',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.1,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           ResultCard(
             scanResult: _result!,
             onAction: _dismiss,
