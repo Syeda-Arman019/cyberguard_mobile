@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../core/theme.dart';
 import '../services/history_service.dart';
@@ -15,6 +16,7 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
   // 1. Protection & Notification Toggles (UI placeholders for now)
   bool _protectionMode = true;
   bool _securityNotifications = true;
+bool _childSafeMode = false;
 
   // 2. Permission Statuses
   PermissionStatus? _cameraStatus;
@@ -31,6 +33,7 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
     WidgetsBinding.instance.addObserver(this);
     _loadStats();
     _checkPermissions();
+    _loadPrefs();
   }
 
   @override
@@ -150,6 +153,17 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
     }
   }
 
+    /// Load persisted settings from SharedPreferences
+  Future<void> _loadPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _protectionMode = prefs.getBool('protection_mode_enabled') ?? true;
+      _securityNotifications = prefs.getBool('security_notifications') ?? true;
+      _childSafeMode = prefs.getBool('child_safe_mode') ?? false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -184,8 +198,10 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                       title: '🛡 Protection Mode',
                       subtitle: 'Enable URL protection features.',
                       value: _protectionMode,
-                      onChanged: (v) {
+                      onChanged: (v) async {
                         setState(() => _protectionMode = v);
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('protection_mode_enabled', v);
                       },
                     ),
                     const Divider(color: CyberColors.border, height: 24),
@@ -194,8 +210,22 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                       title: '🔔 Security Notifications',
                       subtitle: 'Receive alerts when a risky URL is detected.',
                       value: _securityNotifications,
-                      onChanged: (v) {
+                      onChanged: (v) async {
                         setState(() => _securityNotifications = v);
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('security_notifications', v);
+                      },
+                    ),
+                    const Divider(color: CyberColors.border, height: 24),
+                    _buildSwitchTile(
+                      icon: Icons.child_care_outlined,
+                      title: '👶 Child Safe Mode',
+                      subtitle: "Block dangerous links completely (recommended for children's devices).",
+                      value: _childSafeMode,
+                      onChanged: (v) async {
+                        setState(() => _childSafeMode = v);
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('child_safe_mode', v);
                       },
                     ),
                   ],

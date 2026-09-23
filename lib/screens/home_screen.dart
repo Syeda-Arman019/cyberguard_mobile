@@ -6,6 +6,7 @@ import 'qr_scan_screen.dart';
 import 'share_receive_screen.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
+import 'auto_protection_screen.dart';
 import 'widgets/cyber_components.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -133,7 +134,35 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 20),
+                             // Auto Protection Info Banner
+                            // Auto Protection Info Banner
+              CyberCard(
+                padding: const EdgeInsets.all(12),
+                borderColor: CyberColors.cyan.withAlpha(80),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.shield_rounded, color: CyberColors.cyan, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '🛡️ Auto Protection is active — links tapped in other apps (WhatsApp, browser, etc.) can be opened with CyberGuard for automatic safety checks',
+                        style: const TextStyle(fontSize: 12, color: CyberColors.textSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+               _buildFeatureCard(
+                 context: context,
+                 icon: Icons.shield_rounded,
+                 title: 'Test Auto Protection',
+                 subtitle: 'Demo auto‑protection scanning with a test URL',
+                 destination: const AutoProtectionScreen(
+                   url: 'http://testsafebrowsing.appspot.com/s/phishing.html',
+                 ),
+               ),
+               const SizedBox(height: 20),
               const SectionHeader(title: 'Security Features'),
               const SizedBox(height: 12),
 
