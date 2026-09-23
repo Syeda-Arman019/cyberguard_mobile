@@ -2,12 +2,19 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/theme.dart';
 import '../models/scan_result.dart';
 import '../services/history_service.dart';
 import 'home_screen.dart';
 import 'scan_detail_screen.dart';
 import 'widgets/cyber_components.dart';
+
+/// Route observer so the dashboard re-loads saved settings (and stats) when
+/// the user returns to it from screens pushed above it (e.g. Settings).
+/// Registered on the MaterialApp via `navigatorObservers` in main.dart.
+final RouteObserver<ModalRoute<void>> dashboardRouteObserver =
+    RouteObserver<ModalRoute<void>>();
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -16,18 +23,61 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen>
+    with WidgetsBindingObserver, RouteAware {
   late List<ScanResult> _scans;
+  bool _protectionEnabled = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    dashboardRouteObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    dashboardRouteObserver.subscribe(this, ModalRoute.of(context)!);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-read saved state when the app resumes (e.g. after app switch).
+    if (state == AppLifecycleState.resumed) {
+      _refresh();
+    }
+  }
+
+  @override
+  void didPopNext() {
+    // Called when a route pushed above this one (e.g. Settings) is popped.
     _refresh();
   }
 
   void _refresh() {
-    final all = HistoryService.instance.getAllScans();
-    setState(() => _scans = all);
+    setState(() => _scans = HistoryService.instance.getAllScans());
+    _loadProtectionState();
+  }
+
+  /// Reads the persisted Protection Mode value from SharedPreferences.
+  Future<void> _loadProtectionState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      setState(() {
+        _protectionEnabled = prefs.getBool('protection_mode_enabled') ?? true;
+      });
+    } catch (_) {
+      // Keep the last known value (defaults to true) if prefs are unavailable.
+    }
   }
 
   int get _total => _scans.length;
@@ -162,11 +212,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: const Icon(Icons.security, color: CyberColors.cyan, size: 28),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'URL Security',
                   style: TextStyle(
                     fontSize: 20,
@@ -175,10 +225,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     letterSpacing: 0.3,
                   ),
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 SecurityStatusBadge(
-                  label: 'Protection ON',
-                  isProtected: true,
+                  label: _protectionEnabled ? 'Protection ON' : 'Protection OFF',
+                  isProtected: _protectionEnabled,
                 ),
               ],
             ),

@@ -48,8 +48,6 @@ bool _childSafeMode = false;
     if (state == AppLifecycleState.resumed) {
       _checkPermissions();
       _loadStats();
-      // Re-sync toggles with persisted values in case they changed elsewhere.
-      _loadPrefs();
     }
   }
 

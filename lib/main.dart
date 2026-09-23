@@ -36,6 +36,7 @@ class CyberGuardApp extends StatelessWidget {
       title: 'CyberGuard Mobile',
       debugShowCheckedModeBanner: false,
       navigatorKey: _navigatorKey,
+      navigatorObservers: [dashboardRouteObserver],
       theme: CyberTheme.darkTheme,
       home: const DashboardScreen(),
     );
