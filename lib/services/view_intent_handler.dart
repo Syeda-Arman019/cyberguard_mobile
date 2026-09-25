@@ -24,6 +24,46 @@ class ViewIntentHandler {
 
   static bool _registered = false;
 
+  /// Recursion guard: when CyberGuard itself launches a verified URL into
+  /// the user's browser, Android may echo the opening VIEW intent back to
+  /// this app (e.g. "Open with" resolution or an app-link verification
+  /// callback). Without suppression the loop would be
+  /// CyberGuard → browser → CyberGuard → ... Every successful external
+  /// launch records the URL here for a short window; echoes of the SAME URL
+  /// are ignored, while a genuinely new tapped link is still intercepted.
+  static String? _selfLaunchedUrl;
+  static DateTime? _selfLaunchedAt;
+  static const Duration _selfLaunchWindow = Duration(seconds: 8);
+
+  /// Marks [url] as launched by CyberGuard itself so the VIEW-intent echo
+  /// cannot re-enter interception. Only [openExternal] calls this.
+  static void markSelfLaunched(String url) {
+    _selfLaunchedUrl = url;
+    _selfLaunchedAt = DateTime.now();
+  }
+
+  /// True when [url] equals the URL CyberGuard just opened externally and
+  /// the echo arrives inside the guard window.
+  static bool _isSelfLaunchEcho(String url) {
+    final at = _selfLaunchedAt;
+    if (_selfLaunchedUrl != url || at == null) return false;
+    final isEcho = DateTime.now().difference(at) < _selfLaunchWindow;
+    if (!isEcho) {
+      // Window expired — clear so old state can never suppress a new tap.
+      _selfLaunchedUrl = null;
+      _selfLaunchedAt = null;
+    }
+    return isEcho;
+  }
+
+  /// Clears the guard when no external launch actually happened (launchUrl
+  /// returned false or threw), so the next genuine tap of the same URL is
+  /// still intercepted instead of being wrongly swallowed.
+  static void clearSelfLaunched() {
+    _selfLaunchedUrl = null;
+    _selfLaunchedAt = null;
+  }
+
   /// Registers the view channel and pulls any cold-start URL after the
   /// first frame (so the navigator can accept pushes). Call once from main.
   static void listen(GlobalKey<NavigatorState> navigatorKey) {
@@ -67,6 +107,12 @@ class ViewIntentHandler {
     final uri = Uri.tryParse(trimmed);
     if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
       debugPrint('VIEW URL ignored: not http/https');
+      return;
+    }
+
+    // CyberGuard → browser echo: never re-intercept our own launches.
+    if (_isSelfLaunchEcho(trimmed)) {
+      debugPrint('VIEW URL ignored: self-launched echo (recursion guard)');
       return;
     }
 

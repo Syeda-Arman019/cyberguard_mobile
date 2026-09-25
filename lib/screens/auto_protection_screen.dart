@@ -7,6 +7,7 @@ import 'widgets/result_card.dart';
 import '../core/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/view_intent_handler.dart';
 
 class AutoProtectionScreen extends StatefulWidget {
   final String? url;
@@ -22,6 +23,9 @@ class _AutoProtectionScreenState extends State<AutoProtectionScreen> {
   bool _childSafeMode = false;
   bool _protectionEnabled = true;
   bool _alertSilenced = false;
+  // The 🟢 Link Verified Safe confirmation is shown exactly once per safe
+  // result (rebuilds must never re-open the dialog).
+  bool _safeDialogShown = false;
 
   @override
   void initState() {
@@ -68,6 +72,12 @@ class _AutoProtectionScreenState extends State<AutoProtectionScreen> {
           _result = result;
           _isLoading = false;
         });
+        // Safe result: a lightweight 🟢 confirmation popup (no siren, no
+        // vibration, no danger notification — handleResult already stopped
+        // and cancelled all of them for safe results).
+        if (result.riskLevel == RiskLevel.safe) {
+          _showSafeConfirmation();
+        }
       }
 
       // Protection Mode decides whether anything alerts at all. The shared
@@ -111,11 +121,95 @@ class _AutoProtectionScreenState extends State<AutoProtectionScreen> {
     if (_result == null) return;
     final uri = Uri.tryParse(_result!.url);
     if (uri == null) return;
+    // Recursion guard BEFORE launching: record that this exact URL is being
+    // opened by CyberGuard itself so the VIEW-intent echo of our own launch
+    // can never re-enter interception (CyberGuard → browser → CyberGuard…).
+    ViewIntentHandler.markSelfLaunched(_result!.url);
     try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) ViewIntentHandler.clearSelfLaunched();
     } catch (_) {
+      ViewIntentHandler.clearSelfLaunched();
       // No external browser available to handle the link.
     }
+  }
+
+  /// Lightweight, professional 🟢 confirmation for SAFE results. Deliberately
+  /// NOT the danger alert: no siren, no vibration, no persistent danger
+  /// notification — the existing ScanAlertService already ensured all three
+  /// are silent/cancelled for safe results. Continue opens the ORIGINAL URL
+  /// (exact string Android delivered) in the user's normal browser; Go Back
+  /// simply dismisses the popup and leaves the user in CyberGuard, never
+  /// trapped.
+  void _showSafeConfirmation() {
+    if (_safeDialogShown || _result == null) return;
+    _safeDialogShown = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _result == null) return;
+      String host = _result!.url;
+      try {
+        final parsed = Uri.tryParse(_result!.url)?.host;
+        if (parsed != null && parsed.isNotEmpty) host = parsed;
+      } catch (_) {
+        // Fall back to the full original URL.
+      }
+      showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogContext) => AlertDialog(
+          title: Row(
+            children: const [
+              Icon(Icons.verified_rounded, color: CyberColors.safe),
+              SizedBox(width: 8),
+              Expanded(child: Text('🟢 Link Verified Safe')),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'CyberGuard checked this link and found no known security threats.',
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: CyberColors.bgDark.withAlpha(180),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: CyberColors.borderSubtle),
+                ),
+                child: Text(
+                  host,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 13,
+                    color: CyberColors.safe,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Go Back'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                _openInExternalBrowser();
+              },
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   /// Stops siren, vibration and the danger notification, then leaves the

@@ -3,6 +3,13 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <!-- Required on Android 13+ to show the persistent dangerous-URL alert -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Auto Protection Phase 1: notification link scanning -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <application
         android:label="cyberguard_mobile"
@@ -43,6 +50,31 @@
         <data android:scheme="https" />
     </intent-filter>
         </activity>
+        <!-- Auto Protection Phase 1: notification scanner (layer 1) -->
+        <service
+            android:name="com.example.cyberguard_mobile.autoprotection.LinkNotificationListener"
+            android:exported="false"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Keeps the listener alive with a low-importance persistent notice -->
+        <service
+            android:name="com.example.cyberguard_mobile.autoprotection.AutoProtectionForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Restarts the foreground service after reboot -->
+        <receiver
+            android:name="com.example.cyberguard_mobile.autoprotection.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
