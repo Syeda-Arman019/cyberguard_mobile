@@ -935,36 +935,22 @@ bool _childSafeMode = false;
                 ],
               ),
             ),
-            // State-appropriate action. Android cannot programmatically
-            // revoke an already-granted runtime permission, so when Granted
-            // we show "Manage Access" which opens the REAL Android app
-            // permission settings (openAppSettings) — never a fake toggle.
-            // The displayed state always comes from the real OS state and is
-            // re-checked on every app resume.
-            TextButton.icon(
-              style: TextButton.styleFrom(
-                foregroundColor:
-                    isGranted ? CyberColors.textSecondary : CyberColors.cyan,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            // Action button if not granted
+            if (!isGranted)
+              TextButton.icon(
+                style: TextButton.styleFrom(
+                  foregroundColor: CyberColors.cyan,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                ),
+                onPressed: onRequest,
+                icon: const Icon(Icons.settings_outlined, size: 14),
+                label: Text(
+                  status == PermissionStatus.permanentlyDenied
+                      ? 'Open Settings'
+                      : 'Grant Permission',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
               ),
-              onPressed: isGranted
-                  ? () async {
-                      await openAppSettings();
-                    }
-                  : onRequest,
-              icon: Icon(
-                isGranted ? Icons.tune_rounded : Icons.settings_outlined,
-                size: 14,
-              ),
-              label: Text(
-                isGranted
-                    ? 'Manage Access'
-                    : status == PermissionStatus.permanentlyDenied
-                        ? 'Open Settings'
-                        : 'Grant Permission',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-              ),
-            ),
           ],
         ),
       ],

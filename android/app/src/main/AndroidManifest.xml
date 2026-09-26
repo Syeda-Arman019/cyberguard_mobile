@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- SMS permission is surfaced (status + request) in Settings > Device
+         Permissions. Android 6-12 requires the manifest entry for
+         permission_handler to report/request the real state. -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS"/>
     <!-- Required on Android 13+ to show the persistent dangerous-URL alert -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- Auto Protection Phase 1: notification link scanning -->

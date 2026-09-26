@@ -4,7 +4,7 @@ import '../core/theme.dart';
 import 'manual_scan_screen.dart';
 import 'qr_scan_screen.dart';
 import 'share_receive_screen.dart';
-import 'auto_protection_info_screen.dart';
+import 'auto_protection_screen.dart';
 import 'widgets/cyber_components.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -115,7 +115,7 @@ class HomeScreen extends StatelessWidget {
                           ),
                           SizedBox(height: 3),
                           Text(
-                            'Select a feature to analyze links, QR codes, and shared content for threats.',
+                            'Select an analysis tool to detect phishing, malware, and rogue links.',
                             style: TextStyle(fontSize: 12, color: CyberColors.textSecondary),
                           ),
                         ],
@@ -125,24 +125,42 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
 
-              // Intentional breathing room so the heading doesn't sit
-              // flush against the header card above it.
-              const SizedBox(height: 22),
+                             // Auto Protection Info Banner
+                            // Auto Protection Info Banner
+              CyberCard(
+                padding: const EdgeInsets.all(12),
+                borderColor: CyberColors.cyan.withAlpha(80),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.shield_rounded, color: CyberColors.cyan, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '🛡️ Auto Protection is active — links tapped in other apps (WhatsApp, browser, etc.) can be opened with CyberGuard for automatic safety checks',
+                        style: const TextStyle(fontSize: 12, color: CyberColors.textSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+               _buildFeatureCard(
+                 context: context,
+                 icon: Icons.shield_rounded,
+                 title: 'Test Auto Protection',
+                 subtitle: 'Demo auto‑protection scanning with a test URL',
+                 destination: const AutoProtectionScreen(
+                   url: 'http://testsafebrowsing.appspot.com/s/phishing.html',
+                 ),
+               ),
+               const SizedBox(height: 20),
               const SectionHeader(title: 'Security Features'),
               const SizedBox(height: 12),
 
               _buildFeatureCard(
                 context: context,
-                icon: Icons.shield_rounded,
-                title: 'Auto Protection',
-                subtitle: 'Automatic link checks with alerts for risky URLs',
-                destination: const AutoProtectionInfoScreen(),
-              ),
-
-              _buildFeatureCard(
-                context: context,
                 icon: Icons.link_rounded,
-                title: 'Manual Scan',
+                title: 'Manual URL Scan',
                 subtitle: 'Analyze any web link or domain for security threats',
                 destination: const ManualScanScreen(),
               ),
@@ -150,7 +168,7 @@ class HomeScreen extends StatelessWidget {
               _buildFeatureCard(
                 context: context,
                 icon: Icons.qr_code_scanner_rounded,
-                title: 'QR Scan',
+                title: 'QR Code Scanner',
                 subtitle: 'Scan physical QR codes and extract URLs safely',
                 destination: const QrScanScreen(),
               ),
@@ -158,7 +176,7 @@ class HomeScreen extends StatelessWidget {
               _buildFeatureCard(
                 context: context,
                 icon: Icons.share_rounded,
-                title: 'Share Link',
+                title: 'Share to CyberGuard',
                 subtitle: 'Inspect URLs shared directly from external apps',
                 destination: const ShareReceiveScreen(sharedText: ''),
               ),

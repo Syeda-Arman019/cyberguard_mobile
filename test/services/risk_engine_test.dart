@@ -201,5 +201,157 @@ void main() {
       expect(result.riskScore, 0);
       expect(result.riskLevel, RiskLevel.safe);
     });
+
+    // --- URL normalization + decoding / traversal / encoding heuristics ---
+
+    test('percent-encoded keyword is decoded and scored (+10)', () async {
+      // %6C%6F%67%69%6E == "login" — must be caught after safe decoding.
+      final result = await engine.analyzeUrl(
+          'https://example.com/%6C%6F%67%69%6E', ScanSource.manual);
+
+      expect(result.riskScore, 10);
+      expect(result.reasons,
+          contains('The web address contains sensitive account or security-related keywords.'));
+    });
+
+    test('path traversal pattern adds +10', () async {
+      final result = await engine.analyzeUrl(
+          'https://example.com/download?file=../../etc/passwd', ScanSource.manual);
+
+      expect(result.riskScore, 10);
+      expect(result.reasons, contains('Suspicious path traversal pattern detected.'));
+    });
+
+    test('double-encoded traversal adds suspicious-encoding +10', () async {
+      final result = await engine.analyzeUrl(
+          'https://example.com/a?x=%252e%252e%252f', ScanSource.manual);
+
+      // %252e%252e%252f decodes to ../ so BOTH traversal (+10) and
+      // suspicious-encoding (+10) fire.
+      expect(result.riskScore, 20);
+      expect(result.reasons, contains('Suspicious encoded URL pattern detected.'));
+      expect(result.reasons, contains('Suspicious path traversal pattern detected.'));
+    });
+
+    test('legitimate percent-encoding alone does not flag', () async {
+      // Ordinary escaped-space URL: decodes cleanly, no suspicious pattern.
+      final result = await engine.analyzeUrl(
+          'https://example.com/my%20page', ScanSource.manual);
+
+      expect(result.riskScore, 0);
+      expect(result.threatType, ThreatType.none);
+    });
+
+    test('original URL is preserved on the result (no decoded rewrite)', () async {
+      const raw = 'https://example.com/%6C%6F%67%69%6E';
+      final result = await engine.analyzeUrl(raw, ScanSource.manual);
+
+      expect(result.url, raw);
+    });
+
+    // --- Verified brand registry ---
+
+    test('official brand domains and subdomains are NOT flagged', () async {
+      for (final url in [
+        'https://www.paypal.com/',
+        'https://google.com',
+        'https://icloud.com',
+        'https://mail.google.com',
+      ]) {
+        final result = await engine.analyzeUrl(url, ScanSource.manual);
+        expect(result.threatType, ThreatType.none, reason: url);
+        expect(result.riskScore, 0, reason: url);
+      }
+    });
+
+    test('newly verified brands flag on non-official domains', () async {
+      final result = await engine.analyzeUrl(
+          'https://wellsfargo-alerts.com', ScanSource.manual);
+
+      expect(result.threatType, ThreatType.brandImpersonation);
+      expect(result.riskLevel, RiskLevel.suspicious); // override
+      expect(result.riskScore, 15);
+    });
+
+    test('brand mention in PATH or QUERY is not impersonation', () async {
+      final result = await engine.analyzeUrl(
+          'https://www.example.com/news/paypal-announces-new-feature?q=netflix',
+          ScanSource.manual);
+
+      expect(result.threatType, ThreatType.none);
+    });
+
+    test('shared-infrastructure hosts are not flagged as impersonation', () async {
+      final result = await engine.analyzeUrl(
+          'https://mybucket.s3.amazonaws.com/paypal-info.html', ScanSource.manual);
+
+      // Host is AWS infra: no impersonation. The word "paypal" in the path
+      // must not contribute either.
+      expect(result.threatType, ThreatType.none);
+    });
+
+    test('word containing a short brand token is not flagged', () async {
+      // "purchase" contains "cha"? No — but "citizens" contains "citi".
+      // citizensbank.com is a real unrelated bank: must NOT flag citi.
+      final result = await engine.analyzeUrl(
+          'https://www.citizensbank.com', ScanSource.manual);
+
+      expect(result.threatType, ThreatType.none);
+    });
+
+    test('concatenated phishing pattern flags (applesupport-style)', () async {
+      final result = await engine.analyzeUrl(
+          'https://applesupport-verify.com', ScanSource.manual);
+
+      expect(result.threatType, ThreatType.brandImpersonation);
+    });
+
+    test('punycode host adds suspicious-encoding +10', () async {
+      final result = await engine.analyzeUrl(
+          'https://xn--pple-43d.com', ScanSource.manual);
+
+      expect(result.riskScore, 10);
+      expect(result.reasons, contains('Suspicious encoded URL pattern detected.'));
+    });
+
+    // --- Registry audit regression: brand-owned infra must NOT flag ---
+
+    test('Citi corporate domain is official, not impersonation', () async {
+      final result = await engine.analyzeUrl(
+          'https://www.citigroup.com/global/about-us', ScanSource.manual);
+
+      expect(result.threatType, ThreatType.none);
+    });
+
+    test('Apple CDN, WhatsApp/Facebook net domains are official', () async {
+      for (final url in [
+        'https://cdn-apple.com/resource/some-asset',
+        'https://static.whatsapp.net/rsrc.php/style.css',
+        'https://www.facebook.net/some-page',
+      ]) {
+        final result = await engine.analyzeUrl(url, ScanSource.manual);
+        expect(result.threatType, ThreatType.none, reason: url);
+      }
+    });
+
+    test('Google infrastructure hosts are not brand impersonation', () async {
+      for (final url in [
+        'https://rr1---sn-xyz.googlevideo.com/videoplayback?id=abc',
+        'https://www.googleadservices.com/pagead/conversion',
+        'https://www.googletagmanager.com/gtm.js',
+        'https://www.google-analytics.com/collect',
+        'https://pagead2.googlesyndication.com/ads',
+      ]) {
+        final result = await engine.analyzeUrl(url, ScanSource.manual);
+        expect(result.threatType, ThreatType.none, reason: url);
+      }
+    });
+
+    test('Microsoft AAD login host is official, not impersonation', () async {
+      final result = await engine.analyzeUrl(
+          'https://login.microsoftonline.com/common/oauth2', ScanSource.manual);
+
+      expect(result.threatType, ThreatType.none);
+    });
   });
 }

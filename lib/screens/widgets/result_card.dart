@@ -133,6 +133,56 @@ class ResultCard extends StatelessWidget {
               ],
             ),
 
+            const SizedBox(height: 14),
+            // Compact 0–100 score gauge. Visual only: the score, the level,
+            // and the display-override behavior above are untouched. The
+            // filled portion and the tick colors reuse the app-wide
+            // thresholds (0–40 safe, 41–70 suspicious, 71–100 malicious).
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Stack(
+                children: [
+                  Container(height: 8, color: CyberColors.bgDark.withAlpha(160)),
+                  FractionallySizedBox(
+                    widthFactor: (scanResult.riskScore.clamp(0, 100)) / 100.0,
+                    child: Container(height: 8, color: color),
+                  ),
+                  Positioned.fill(
+                    child: Row(
+                      children: [
+                        const Spacer(),
+                        Container(width: 1.5, color: CyberColors.bgDark.withAlpha(160)),
+                        const Spacer(),
+                        Container(width: 1.5, color: CyberColors.bgDark.withAlpha(160)),
+                        const Spacer(),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 5),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('0–40 Safe',
+                    style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: CyberColors.safe.withAlpha(200))),
+                Text('41–70 Suspicious',
+                    style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: CyberColors.suspicious.withAlpha(200))),
+                Text('71–100 Malicious',
+                    style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: CyberColors.malicious.withAlpha(200))),
+              ],
+            ),
+
             const SizedBox(height: 12),
             const Divider(color: CyberColors.border, height: 1),
             const SizedBox(height: 14),

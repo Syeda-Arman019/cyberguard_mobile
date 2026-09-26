@@ -458,9 +458,6 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   // 3b. Scan Activity grid — compact per-method cards. Counts come live
   // from the already-loaded HistoryService data (no separate storage).
-  // Aspect ratio 2.45 (was 2.6): gives the inner column enough vertical
-  // space for the two-line "Auto Protection" label + count line without
-  // RenderFlex overflow, while keeping the same compact card design.
   Widget _buildScanActivityGrid() {
     return GridView.count(
       crossAxisCount: 2,
@@ -468,7 +465,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 10,
       mainAxisSpacing: 10,
-      childAspectRatio: 2.45,
+      childAspectRatio: 2.6,
       children: [
         _buildScanMethodCard(
           icon: Icons.link_rounded,
@@ -538,18 +535,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Full label, wrapped naturally when narrow (e.g.
-                    // "Auto Protection" → "Auto\nProtection") — never
-                    // ellipsized, so the full phrase always stays readable.
                     Text(
                       label,
-                      maxLines: 2,
-                      overflow: TextOverflow.visible,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: CyberColors.textPrimary,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        height: 1.15,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -564,14 +557,21 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ],
                 ),
               ),
-              // Original arrow affordance for Scan Activity cards —
-              // intentionally different from the stat cards' "Details"
-              // button. Opens the same source-filtered History view as
-              // tapping the card.
-              Icon(
-                Icons.chevron_right_rounded,
-                color: color.withAlpha(140),
-                size: 18,
+              // Small circular Details affordance — opens the same
+              // source-filtered History view as tapping the card.
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color.withAlpha(30),
+                  border: Border.all(color: color.withAlpha(110), width: 1.1),
+                ),
+                child: Icon(
+                  Icons.arrow_outward_rounded,
+                  color: color,
+                  size: 14,
+                ),
               ),
             ],
           ),

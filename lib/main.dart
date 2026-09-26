@@ -6,7 +6,8 @@ import 'services/history_service.dart';
 import 'services/scan_alert_service.dart';
 import 'services/view_intent_handler.dart';
 import 'services/auto_protection_service.dart';
-import 'screens/dashboard_screen.dart';
+import 'screens/dashboard_screen.dart' show dashboardRouteObserver;
+import 'screens/main_shell_screen.dart';
 import 'screens/share_receive_screen.dart';
 
 /// Global navigator key used by ShareIntentHandler
@@ -61,7 +62,7 @@ class CyberGuardApp extends StatelessWidget {
       navigatorKey: _navigatorKey,
       navigatorObservers: [dashboardRouteObserver],
       theme: CyberTheme.darkTheme,
-      home: const DashboardScreen(),
+      home: const MainShellScreen(),
     );
   }
 }

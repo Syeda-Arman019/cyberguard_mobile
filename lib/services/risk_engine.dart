@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/scan_result.dart';
+import 'brand_registry.dart';
+import 'url_preprocessor.dart';
 
 /// Google Safe Browsing API Key constant.
 /// Replace with your actual API key from Google Cloud Console.
@@ -32,15 +34,6 @@ class RiskEngine {
     'account',
   ];
 
-  /// Brand name to legitimate domain patterns mapping.
-  static const Map<String, List<String>> _knownBrands = {
-    'paypal': ['paypal.com'],
-    'google': ['google.com'],
-    'facebook': ['facebook.com', 'fb.com'],
-    'amazon': ['amazon.com'],
-    'apple': ['apple.com', 'icloud.com'],
-  };
-
   /// Analyzes a [url] for security risks and returns a [ScanResult].
   ///
   /// Incorporates Google Safe Browsing lookup and local heuristic checks.
@@ -54,16 +47,31 @@ class RiskEngine {
       final parsedUri = _tryParseUri(trimmedUrl);
       final host = parsedUri?.host.toLowerCase() ?? '';
 
+      // 0. Safe bounded preprocessing (normalization + decoding).
+      // SECURITY ANALYSIS ONLY — the original URL stays on the result,
+      // history, ResultCard and notifications untouched.
+      final pre = PreprocessedUrl.process(trimmedUrl);
+      final analysisHost = pre.host.isNotEmpty ? pre.host : host;
+
       // 1. Google Safe Browsing API Check
       final googleThreat = await _checkGoogleSafeBrowsing(trimmedUrl);
 
       // 2. Local Heuristic Checks
       final bool hasGoogleThreat = googleThreat != null;
       final bool isNoHttps = !lowerUrl.startsWith('https://');
-      final bool isIpAddress = _isIpAddress(host);
-      final bool hasPhishingKeyword = _hasPhishingKeywords(lowerUrl);
+      final bool isIpAddress = _isIpAddress(analysisHost);
+      // Keywords are evaluated on the DECODED text so encoded payloads
+      // (%6C%6F%67%69%6E -> login) can no longer hide from this rule.
+      final bool hasPhishingKeyword =
+          _hasPhishingKeywords(lowerUrl) || _hasPhishingKeywords(pre.analyzed);
       final bool isLongUrl = trimmedUrl.length > 75;
-      final bool isBrandImpersonation = _isBrandImpersonation(host);
+      final bool isBrandImpersonation =
+          BrandRegistry.findImpersonatedBrand(analysisHost) != null;
+      // Path traversal / suspicious encoded patterns (heuristic only).
+      final bool hasTraversalPattern = _hasTraversalPattern(pre.analyzed);
+      final bool hasSuspiciousEncoding = pre.doubleEncoded ||
+          pre.encodedTraversal ||
+          pre.hasPunycodeHost;
 
       // Calculate risk score with defined weights
       int score = 0;
@@ -107,6 +115,18 @@ class RiskEngine {
         score += 15;
         localFlagsCount++;
         reasons.add('The domain resembles a well-known brand but is not an official domain.');
+      }
+
+      if (hasTraversalPattern) {
+        score += 10;
+        localFlagsCount++;
+        reasons.add('Suspicious path traversal pattern detected.');
+      }
+
+      if (hasSuspiciousEncoding) {
+        score += 10;
+        localFlagsCount++;
+        reasons.add('Suspicious encoded URL pattern detected.');
       }
 
       // Cap risk score between 0 and 100
@@ -233,6 +253,16 @@ class RiskEngine {
     return null;
   }
 
+  /// True when the (decoded) URL contains path-traversal syntax such as
+  /// `../`, `..\` or raw dot-segment tricks. Heuristic indicator only —
+  /// traversal syntax alone never proves a URL is compromised.
+  bool _hasTraversalPattern(String analyzedUrl) {
+    return analyzedUrl.contains('../') ||
+        analyzedUrl.contains('..\\') ||
+        analyzedUrl.contains('/..') ||
+        analyzedUrl.contains('%2e%2e');
+  }
+
   /// Checks if the host represents a raw IPv4 or IPv6 address.
   bool _isIpAddress(String host) {
     if (host.isEmpty) return false;
@@ -255,41 +285,6 @@ class RiskEngine {
   /// Checks if the URL contains any common phishing keywords.
   bool _hasPhishingKeywords(String lowerUrl) {
     return _phishingKeywords.any((keyword) => lowerUrl.contains(keyword));
-  }
-
-  /// Checks if the host imitates a known brand without being their official domain.
-  bool _isBrandImpersonation(String host) {
-    if (host.isEmpty) return false;
-
-    for (final entry in _knownBrands.entries) {
-      final brand = entry.key;
-      final legitDomains = entry.value;
-
-      if (host.contains(brand)) {
-        bool isLegitimate = false;
-
-        for (final legit in legitDomains) {
-          if (host == legit || host.endsWith('.$legit')) {
-            isLegitimate = true;
-            break;
-          }
-        }
-
-        // Support international country-code TLDs for google and amazon (e.g., google.co.uk, amazon.de)
-        if (!isLegitimate && (brand == 'google' || brand == 'amazon')) {
-          final cctldPattern = RegExp('^([a-z0-9-]+\\.)*$brand\\.[a-z]{2,3}(\\.[a-z]{2})?\$');
-          if (cctldPattern.hasMatch(host)) {
-            isLegitimate = true;
-          }
-        }
-
-        if (!isLegitimate) {
-          return true;
-        }
-      }
-    }
-
-    return false;
   }
 
   /// Generates clear, actionable recommendation text based on the threat type.

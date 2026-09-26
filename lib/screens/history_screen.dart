@@ -8,7 +8,17 @@ import 'widgets/cyber_components.dart';
 import 'scan_detail_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key});
+  /// Optional risk-level filter applied when the screen opens (used by the
+  /// tappable dashboard stat cards, e.g. tapping MALICIOUS opens the log
+  /// pre-filtered to malicious scans only). Null = show everything.
+  final RiskLevel? initialFilter;
+
+  /// Optional scan-source filter applied when the screen opens (used by the
+  /// dashboard Scan Activity cards, e.g. tapping "Manual Scan" shows only
+  /// manually scanned URLs). Null = show everything.
+  final ScanSource? initialSource;
+
+  const HistoryScreen({super.key, this.initialFilter, this.initialSource});
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -17,15 +27,54 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   late List<ScanResult> scans;
 
+  /// Active filters: start from the constructor params; the user can clear
+  /// them with the filter chip(s) shown below the app bar.
+  RiskLevel? _filter;
+  ScanSource? _sourceFilter;
+
   @override
   void initState() {
     super.initState();
+    _filter = widget.initialFilter;
+    _sourceFilter = widget.initialSource;
     _loadScans();
   }
 
   void _loadScans() {
-    scans = HistoryService.instance.getAllScans();
+    final all = HistoryService.instance.getAllScans();
+    scans = all
+        .where((s) => _filter == null || s.riskLevel == _filter)
+        .where((s) => _sourceFilter == null || s.source == _sourceFilter)
+        .toList();
     setState(() {});
+  }
+
+  String get _filterLabel {
+    switch (_filter) {
+      case RiskLevel.safe:
+        return 'SAFE scans';
+      case RiskLevel.suspicious:
+        return 'SUSPICIOUS scans';
+      case RiskLevel.malicious:
+        return 'MALICIOUS scans';
+      default:
+        return '';
+    }
+  }
+
+  String get _sourceFilterLabel {
+    switch (_sourceFilter) {
+      case ScanSource.manual:
+        return 'Manual scans';
+      case ScanSource.qr:
+        return 'QR scans';
+      case ScanSource.share:
+        return 'Shared links';
+      case ScanSource.autoProtection:
+        return 'Auto Protection';
+      default:
+        return '';
+    }
   }
 
   Future<void> _confirmDeleteAll() async {
@@ -150,13 +199,79 @@ class _HistoryScreenState extends State<HistoryScreen> {
       body: Container(
         decoration: const BoxDecoration(gradient: CyberColors.backgroundGradient),
         child: SafeArea(
-          child: scans.isEmpty
-              ? CyberEmptyState(
-                  icon: Icons.history_rounded,
-                  title: 'No Scan History Recorded',
-                  description:
-                      'When you scan URLs manually, via QR code, or through app shares, your security audit log will appear here.',
-                )
+          child: Column(
+            children: [
+              if (_filter != null || _sourceFilter != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                  child: Row(
+                    children: [
+                      if (_filter != null)
+                        FilterChip(
+                          selected: true,
+                          backgroundColor: CyberColors.cardBg,
+                          selectedColor: CyberColors.cyan.withAlpha(40),
+                          checkmarkColor: CyberColors.cyan,
+                          label: Text(
+                            'Filtered: $_filterLabel',
+                            style: const TextStyle(
+                              color: CyberColors.cyan,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          onSelected: (_) {
+                            setState(() => _filter = null);
+                            _loadScans();
+                          },
+                        ),
+                      if (_sourceFilter != null) ...[
+                        const SizedBox(width: 8),
+                        FilterChip(
+                          selected: true,
+                          backgroundColor: CyberColors.cardBg,
+                          selectedColor: CyberColors.purple.withAlpha(40),
+                          checkmarkColor: CyberColors.purple,
+                          label: Text(
+                            'Source: $_sourceFilterLabel',
+                            style: const TextStyle(
+                              color: CyberColors.purple,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          onSelected: (_) {
+                            setState(() => _sourceFilter = null);
+                            _loadScans();
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              Expanded(child: _buildHistoryBody()),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistoryBody() {
+    return Container(
+      decoration: const BoxDecoration(gradient: CyberColors.backgroundGradient),
+      child: scans.isEmpty
+          ? CyberEmptyState(
+              icon: Icons.history_rounded,
+              title: _filter == null && _sourceFilter == null
+                  ? 'No Scan History Recorded'
+                  : _filter != null
+                      ? 'No $_filterLabel Recorded'
+                      : 'No $_sourceFilterLabel Recorded',
+              description: _filter == null && _sourceFilter == null
+                  ? 'When you scan URLs manually, via QR code, or through app shares, your security audit log will appear here.'
+                  : 'No scans match this filter yet. Clear the filter to see your full audit log.',
+            )
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   itemCount: scans.length,
@@ -318,8 +433,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     );
                   },
                 ),
-        ),
-      ),
     );
   }
 }

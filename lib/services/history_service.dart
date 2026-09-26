@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import '../models/scan_result.dart';
 
@@ -10,6 +11,12 @@ class HistoryService {
 
   static const String _boxName = 'scan_history';
   late final Box<ScanResult> _box;
+
+  /// Notifies listeners whenever the whole history changes (Delete All),
+  /// so every history-derived UI (dashboard stats, trend chart, advisory,
+  /// Settings scan count) can reset in the same frame. Single-scan saves
+  /// and deletions keep using the existing per-screen refresh flows.
+  final ValueNotifier<int> historyVersion = ValueNotifier<int>(0);
 
   /// Initialize Hive and open the box. Must be awaited before any other method.
   Future<void> init() async {
@@ -45,8 +52,10 @@ class HistoryService {
     }
   }
 
-  /// Delete all stored scan history.
+  /// Delete all stored scan history and broadcast the reset so every
+  /// history-derived UI clears immediately (no stale cached statistics).
   Future<void> deleteAllScans() async {
     await _box.clear();
+    historyVersion.value++;
   }
 }
