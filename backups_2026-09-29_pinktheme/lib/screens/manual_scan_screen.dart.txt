@@ -182,7 +182,7 @@ class _ManualScanScreenState extends State<ManualScanScreen> {
                           errorText: _inputError,
                           errorStyle: const TextStyle(color: CyberColors.malicious),
                           filled: true,
-                          fillColor: CyberColors.cardBgElevated.withAlpha(150),
+                          fillColor: CyberColors.bgDark.withAlpha(150),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -223,7 +223,7 @@ class _ManualScanScreenState extends State<ManualScanScreen> {
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: CyberColors.cyan,
-                          foregroundColor: CyberColors.buttonTextColor,
+                          foregroundColor: CyberColors.bgDark,
                           minimumSize: const Size(double.infinity, 50),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),

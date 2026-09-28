@@ -42,16 +42,16 @@ class _MainShellScreenState extends State<MainShellScreen> {
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _destinations),
       bottomNavigationBar: Container(
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
         decoration: BoxDecoration(
-          color: CyberColors.bgSurface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: CyberColors.border, width: 1),
+          color: CyberColors.cardBg,
+          border: Border(
+            top: BorderSide(color: CyberColors.border.withAlpha(120)),
+          ),
           boxShadow: [
             BoxShadow(
-              color: CyberColors.textPrimary.withAlpha(23),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
+              color: Colors.black.withAlpha(90),
+              blurRadius: 12,
+              offset: const Offset(0, -3),
             ),
           ],
         ),
@@ -60,16 +60,14 @@ class _MainShellScreenState extends State<MainShellScreen> {
           child: NavigationBarTheme(
             data: NavigationBarThemeData(
               backgroundColor: Colors.transparent,
-              // Selected item = soft crimson pill with crimson icon+label
-              // (reference theme: crimson active nav).
-              indicatorColor: CyberColors.cyan.withAlpha(38),
-              height: 62,
+              indicatorColor: CyberColors.cyan.withAlpha(35),
+              height: 66,
               labelTextStyle: WidgetStateProperty.resolveWith((states) {
                 final selected = states.contains(WidgetState.selected);
                 return TextStyle(
                   fontSize: 11.5,
                   fontWeight: selected ? FontWeight.bold : FontWeight.w500,
-                  color: selected ? CyberColors.textPrimary : CyberColors.textSecondary,
+                  color: selected ? CyberColors.cyan : CyberColors.textSecondary,
                   letterSpacing: 0.2,
                 );
               }),

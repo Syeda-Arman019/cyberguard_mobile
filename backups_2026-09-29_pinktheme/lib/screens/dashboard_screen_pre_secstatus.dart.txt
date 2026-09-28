@@ -271,12 +271,12 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   // 1. Dashboard Header — hero card with the shield logo beside the
-  // module name, centered; the functional refresh button sits on the
-  // right edge. Height wraps its content (compact padding).
+  // module name and both the title and the Protection badge centered
+  // in the card; the functional refresh button sits on the right edge.
   // White card with soft crimson shadow (reference theme style).
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: CyberColors.cardBg,
         borderRadius: BorderRadius.circular(20),
@@ -292,11 +292,13 @@ class _DashboardScreenState extends State<DashboardScreen>
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Centered group: logo + module name. Protection state is shown
-          // in the Active Security Status section below, not here.
-          Row(
+          // Centered group: logo + module name, protection badge below.
+          Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   Container(
                     width: 40,
                     height: 40,
@@ -319,16 +321,21 @@ class _DashboardScreenState extends State<DashboardScreen>
                       letterSpacing: 0.2,
                     ),
                   ),
-              ],
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Semantic green badge on the white hero card (reference
+              // theme: green = protected) — no override needed.
+              SecurityStatusBadge(
+                label: _protectionEnabled ? 'Protection ON' : 'Protection OFF',
+                isProtected: _protectionEnabled,
+              ),
+            ],
           ),
-          // Functional refresh, pinned to the right edge. Sized exactly to
-          // the 40px circle (no default 48px tap-target padding) so the
-          // circle renders fully inside the compact header card.
+          // Functional refresh, pinned to the right edge.
           Positioned(
             right: 0,
             child: Container(
-              width: 40,
-              height: 40,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: CyberColors.cyan.withAlpha(15),
@@ -336,12 +343,9 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
               child: IconButton(
                 icon: const Icon(Icons.refresh_rounded,
-                    color: CyberColors.cyan, size: 20),
+                    color: CyberColors.cyan, size: 22),
                 tooltip: 'Refresh Stats',
                 onPressed: _refresh,
-                padding: EdgeInsets.zero,
-                visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
               ),
             ),
           ),
@@ -355,39 +359,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   // and live permission statuses. Purely a status display: changing any
   // value still happens in Settings.
   Widget _buildSecurityStatusSection() {
-    // Only actively-enabled protections/permissions are listed — inactive
-    // items stay out of the summary so it reads as an "active" status.
-    final activeItems = <Widget>[
-      if (_protectionEnabled)
-        _buildStatusChip(
-          icon: Icons.shield_rounded,
-          label: 'Protection Mode',
-        ),
-      if (_autoProtectionEnabled)
-        _buildStatusChip(
-          icon: Icons.notifications_rounded,
-          label: 'Auto Protection',
-        ),
-      if (_childSafeMode)
-        _buildStatusChip(
-          icon: Icons.child_care_rounded,
-          label: 'Child Safe Mode',
-        ),
-      if (_securityNotifications)
-        _buildStatusChip(
-          icon: Icons.notifications_active_rounded,
-          label: 'Notifications',
-        ),
-      if (_permissionsGranted)
-        _buildStatusChip(
-          icon: Icons.key_rounded,
-          label: 'Permissions Granted',
-        ),
-    ];
-
-    // Nothing active — don't take up space with an empty section.
-    if (activeItems.isEmpty) return const SizedBox.shrink();
-
     return CyberCard(
       padding: const EdgeInsets.all(14),
       child: Column(
@@ -409,65 +380,87 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          // Compact 2-column grid of active status chips.
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 3.4,
-            padding: EdgeInsets.zero,
-            children: activeItems,
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildStatusChip(
+                icon: Icons.shield_rounded,
+                label: 'Protection Mode',
+                active: _protectionEnabled,
+              ),
+              _buildStatusChip(
+                icon: Icons.notifications_rounded,
+                label: 'Auto Protection',
+                active: _autoProtectionEnabled,
+              ),
+              _buildStatusChip(
+                icon: Icons.child_care_rounded,
+                label: 'Child Safe Mode',
+                active: _childSafeMode,
+              ),
+              _buildStatusChip(
+                icon: Icons.notifications_active_rounded,
+                label: 'Security Notifications',
+                active: _securityNotifications,
+              ),
+              _buildStatusChip(
+                icon: Icons.key_rounded,
+                label: 'Required Permissions',
+                active: _permissionsGranted,
+                activeLabel: 'Granted',
+                inactiveLabel: 'Not Granted',
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  /// One compact status cell for the 2-column grid: tinted icon + label +
-  /// ON pill, in the semantic safe color. Only rendered when active.
+  /// One compact status chip: tinted icon + label + ON/OFF (or
+  /// Granted/Not Granted) pill, colored with the semantic status colors.
   Widget _buildStatusChip({
     required IconData icon,
     required String label,
+    required bool active,
+    String? activeLabel,
+    String? inactiveLabel,
   }) {
-    const statusColor = CyberColors.safe;
+    final statusColor = active ? CyberColors.safe : CyberColors.suspicious;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: statusColor.withAlpha(20),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: statusColor.withAlpha(56)),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: statusColor),
-          const SizedBox(width: 5),
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: CyberColors.textPrimary,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w600,
-              ),
+          Icon(icon, size: 15, color: statusColor),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: CyberColors.textPrimary,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
             decoration: BoxDecoration(
               color: statusColor.withAlpha(41),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Text(
-              'ON',
+            child: Text(
+              active ? (activeLabel ?? 'ON') : (inactiveLabel ?? 'OFF'),
               style: TextStyle(
                 color: statusColor,
-                fontSize: 9.5,
+                fontSize: 10,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.4,
               ),

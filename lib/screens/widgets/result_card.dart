@@ -142,7 +142,7 @@ class ResultCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
               child: Stack(
                 children: [
-                  Container(height: 8, color: CyberColors.bgDark.withAlpha(160)),
+                  Container(height: 8, color: CyberColors.border),
                   FractionallySizedBox(
                     widthFactor: (scanResult.riskScore.clamp(0, 100)) / 100.0,
                     child: Container(height: 8, color: color),
@@ -151,9 +151,9 @@ class ResultCard extends StatelessWidget {
                     child: Row(
                       children: [
                         const Spacer(),
-                        Container(width: 1.5, color: CyberColors.bgDark.withAlpha(160)),
+                        Container(width: 1.5, color: CyberColors.border),
                         const Spacer(),
-                        Container(width: 1.5, color: CyberColors.bgDark.withAlpha(160)),
+                        Container(width: 1.5, color: CyberColors.border),
                         const Spacer(),
                       ],
                     ),
@@ -191,7 +191,7 @@ class ResultCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: CyberColors.bgDark.withAlpha(180),
+                color: CyberColors.cardBgElevated.withAlpha(220),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: CyberColors.borderSubtle),
               ),

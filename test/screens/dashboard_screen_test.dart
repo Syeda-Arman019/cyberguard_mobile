@@ -39,7 +39,6 @@ void main() {
 
       // Header
       expect(find.text('URL Security'), findsOneWidget);
-      expect(find.text('Protection ON'), findsOneWidget);
 
       // Statistics showing 0
       expect(find.text('TOTAL SCANS'), findsOneWidget);

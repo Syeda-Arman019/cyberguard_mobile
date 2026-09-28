@@ -601,7 +601,7 @@ bool _childSafeMode = false;
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: CyberColors.cyan,
-                        foregroundColor: CyberColors.buttonTextColor,
+                        foregroundColor: CyberColors.bgDark,
                       ),
                       onPressed: () => _apChannel
                           .invokeMethod('openBatteryOptimizationSettings')
@@ -1021,7 +1021,7 @@ bool _childSafeMode = false;
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: CyberColors.cardBgElevated,
+              color: CyberColors.bgDark.withAlpha(180),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: CyberColors.cyan.withAlpha(70)),
             ),

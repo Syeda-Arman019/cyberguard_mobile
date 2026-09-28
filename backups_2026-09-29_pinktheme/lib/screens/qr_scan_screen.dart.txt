@@ -110,7 +110,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
               backgroundColor: CyberColors.cyan,
-              foregroundColor: CyberColors.buttonTextColor,
+              foregroundColor: CyberColors.bgDark,
             ),
             onPressed: () async {
               final result = await Permission.camera.request();
@@ -428,12 +428,12 @@ class _QrScanScreenState extends State<QrScanScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             decoration: BoxDecoration(
-              color: CyberColors.bgSurface.withAlpha(242),
+              color: CyberColors.bgDark.withAlpha(220),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(color: CyberColors.border),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withAlpha(77),
+                  color: Colors.black.withAlpha(120),
                   blurRadius: 10,
                 ),
               ],

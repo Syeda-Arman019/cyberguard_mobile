@@ -29,12 +29,12 @@ class CyberCard extends StatelessWidget {
       width: double.infinity,
       padding: padding ?? const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: (backgroundColor ?? CyberColors.cardBg), // solid white card
+        color: (backgroundColor ?? CyberColors.cardBg).withAlpha(217), // ~85% glass
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: effectiveBorderColor, width: borderWidth),
         boxShadow: [
           BoxShadow(
-            color: CyberColors.textPrimary.withAlpha(18),
+            color: Colors.black.withAlpha(38),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -223,7 +223,7 @@ class PrimaryCyberButton extends StatelessWidget {
           borderRadius: BorderRadius.all(Radius.circular(26)),
           boxShadow: [
             BoxShadow(
-              color: Color(0x338B1E3F),
+              color: Color(0x332F6BFF),
               blurRadius: 10,
               offset: Offset(0, 3),
             ),
@@ -234,7 +234,7 @@ class PrimaryCyberButton extends StatelessWidget {
             backgroundColor: Colors.transparent,
             foregroundColor: CyberColors.buttonTextColor,
             disabledBackgroundColor: CyberColors.cyan.withAlpha(77),
-            disabledForegroundColor: CyberColors.textMuted.withAlpha(153),
+            disabledForegroundColor: CyberColors.bgDark.withAlpha(153),
             elevation: 0,
             shadowColor: Colors.transparent,
             shape: const StadiumBorder(),
@@ -464,7 +464,7 @@ class ScanStatCard extends StatelessWidget {
         border: Border.all(color: color.withAlpha(70), width: 1),
         boxShadow: [
           BoxShadow(
-            color: CyberColors.textPrimary.withAlpha(23),
+            color: Colors.black.withAlpha(46),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),

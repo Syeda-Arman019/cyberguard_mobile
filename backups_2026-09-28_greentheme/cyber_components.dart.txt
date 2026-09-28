@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme.dart';
 import '../../models/scan_result.dart';
 
-/// Standard rounded CyberGuard container: soft glass card (dark green,
-/// thin light border, very light shadow) — reference theme style.
+/// Standard rounded CyberGuard container with subtle borders and glow/shadow
 class CyberCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
@@ -29,15 +28,21 @@ class CyberCard extends StatelessWidget {
       width: double.infinity,
       padding: padding ?? const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: (backgroundColor ?? CyberColors.cardBg), // solid white card
-        borderRadius: BorderRadius.circular(20),
+        color: backgroundColor ?? CyberColors.cardBg,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: effectiveBorderColor, width: borderWidth),
         boxShadow: [
           BoxShadow(
-            color: CyberColors.textPrimary.withAlpha(18),
-            blurRadius: 12,
+            color: Colors.black.withAlpha(77),
+            blurRadius: 10,
             offset: const Offset(0, 4),
           ),
+          if (borderColor != null)
+            BoxShadow(
+              color: effectiveBorderColor.withAlpha(20),
+              blurRadius: 14,
+              spreadRadius: 1,
+            ),
         ],
       ),
       child: child,
@@ -47,7 +52,7 @@ class CyberCard extends StatelessWidget {
       return Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           onTap: onTap,
           child: cardContent,
         ),
@@ -63,28 +68,21 @@ class SecurityStatusBadge extends StatelessWidget {
   final String label;
   final bool isProtected;
 
-  /// Optional color override for special backgrounds (e.g. the blue hero
-  /// card, where the green safe-color has poor contrast). Null = default
-  /// semantic color (safe/suspicious) — all existing usages unchanged.
-  final Color? colorOverride;
-
   const SecurityStatusBadge({
     super.key,
     this.label = 'Protection ON',
     this.isProtected = true,
-    this.colorOverride,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = colorOverride ??
-        (isProtected ? CyberColors.safe : CyberColors.suspicious);
+    final color = isProtected ? CyberColors.safe : CyberColors.suspicious;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: color.withAlpha(30),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withAlpha(90), width: 1),
+        border: Border.all(color: color.withAlpha(102), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -215,58 +213,45 @@ class PrimaryCyberButton extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       height: 52,
-      child: DecoratedBox(
-        // Reference theme: pill button with light-green gradient and dark
-        // green text.
-        decoration: const BoxDecoration(
-          gradient: CyberColors.primaryButtonGradient,
-          borderRadius: BorderRadius.all(Radius.circular(26)),
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x338B1E3F),
-              blurRadius: 10,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            foregroundColor: CyberColors.buttonTextColor,
-            disabledBackgroundColor: CyberColors.cyan.withAlpha(77),
-            disabledForegroundColor: CyberColors.textMuted.withAlpha(153),
-            elevation: 0,
-            shadowColor: Colors.transparent,
-            shape: const StadiumBorder(),
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: CyberColors.cyan,
+          foregroundColor: CyberColors.bgDark,
+          disabledBackgroundColor: CyberColors.cyan.withAlpha(77),
+          disabledForegroundColor: CyberColors.bgDark.withAlpha(153),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
           ),
-          onPressed: isLoading ? null : onPressed,
-          child: isLoading
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(CyberColors.buttonTextColor),
-                  ),
-                )
-              : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (icon != null) ...[
-                      Icon(icon, size: 20),
-                      const SizedBox(width: 8),
-                    ],
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
+          elevation: 4,
+          shadowColor: CyberColors.cyan.withAlpha(102),
         ),
+        onPressed: isLoading ? null : onPressed,
+        child: isLoading
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(CyberColors.bgDark),
+                ),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 20),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
   }
@@ -297,7 +282,9 @@ class SecondaryCyberButton extends StatelessWidget {
         style: OutlinedButton.styleFrom(
           foregroundColor: effectiveColor,
           side: BorderSide(color: effectiveColor.withAlpha(153), width: 1.2),
-          shape: const StadiumBorder(),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
         onPressed: onPressed,
         child: Row(
@@ -343,15 +330,21 @@ class SectionHeader extends StatelessWidget {
               width: 3.5,
               height: 14,
               decoration: BoxDecoration(
-                color: CyberColors.skyBlue,
+                color: CyberColors.cyan,
                 borderRadius: BorderRadius.circular(2),
+                boxShadow: [
+                  BoxShadow(
+                    color: CyberColors.cyan.withAlpha(153),
+                    blurRadius: 4,
+                  ),
+                ],
               ),
             ),
             const SizedBox(width: 8),
             Text(
               title.toUpperCase(),
               style: const TextStyle(
-                color: CyberColors.skyBlue,
+                color: CyberColors.cyan,
                 fontSize: 11.5,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.5,
@@ -461,12 +454,12 @@ class ScanStatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: CyberColors.cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withAlpha(70), width: 1),
+        border: Border.all(color: color.withAlpha(71), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: CyberColors.textPrimary.withAlpha(23),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            color: color.withAlpha(15),
+            blurRadius: 10,
+            spreadRadius: 1,
           ),
         ],
       ),
@@ -476,25 +469,16 @@ class ScanStatCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              // Small rounded icon tile (consistent with list tiles app-wide).
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: color.withAlpha(36),
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Icon(icon, color: color, size: 16),
-              ),
-              const SizedBox(width: 8),
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   label,
                   style: TextStyle(
                     color: color,
-                    fontSize: 10.5,
+                    fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 1.0,
+                    letterSpacing: 1.1,
                   ),
                 ),
               ),
@@ -507,9 +491,9 @@ class ScanStatCard extends StatelessWidget {
               Text(
                 '$value',
                 style: TextStyle(
-                  color: CyberColors.textPrimary,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
+                  color: color,
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
                   height: 1,
                 ),
               ),
@@ -524,7 +508,7 @@ class ScanStatCard extends StatelessWidget {
                     color: color.withAlpha(28),
                     borderRadius: BorderRadius.circular(20),
                     border:
-                        Border.all(color: color.withAlpha(90), width: 1),
+                        Border.all(color: color.withAlpha(110), width: 1),
                   ),
                   child: Text(
                     'Details',

@@ -40,13 +40,6 @@ class MainActivity : FlutterActivity() {
     // yet — Dart pulls it via view_channel.getInitialUrl once ready.
     private var pendingViewUrl: String? = null
 
-    // Shared text from a cold-start ACTION_SEND intent. Same cold-start
-    // constraint as pendingViewUrl: Dart is not running when onCreate()
-    // receives the intent, so the text is held here and pulled by the
-    // ShareIntentHandler via share_channel.getInitialShareText once the
-    // navigator is ready. Cleared after delivery, never re-delivered.
-    private var pendingShareText: String? = null
-
     // URL of the currently active danger notification. Tapping the
     // notification routes the user to the warning screen for THIS URL;
     // it never changes any Protection Mode setting.
@@ -60,23 +53,7 @@ class MainActivity : FlutterActivity() {
         }
         // Initialize the method channels after Flutter engine is ready
         flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
-            shareChannel = MethodChannel(messenger, SHARE_CHANNEL).apply {
-                // Dart pulls the cold-start shared text here once the
-                // navigator is ready. Mirrors the existing view_channel
-                // getInitialUrl pull: without this handler the fallback
-                // pull would throw MissingPluginException.
-                setMethodCallHandler { call, result ->
-                    when (call.method) {
-                        "getInitialShareText" -> result.success(pendingShareText.also {
-                            if (it != null) {
-                                pendingShareText = null
-                                Log.d(TAG, "Shared text handed to Flutter (cold start): ${it.take(80)}")
-                            }
-                        })
-                        else -> result.notImplemented()
-                    }
-                }
-            }
+            shareChannel = MethodChannel(messenger, SHARE_CHANNEL)
             viewChannel = MethodChannel(messenger, VIEW_CHANNEL).apply {
                 // Dart pulls the cold-start URL here once the navigator is
                 // ready. Without this handler the pull throws
@@ -167,15 +144,7 @@ class MainActivity : FlutterActivity() {
             val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
             Log.d(TAG, "SEND INTENT RECEIVED: hasText=${sharedText != null}")
             if (sharedText != null) {
-                if (shareChannel != null) {
-                    // Warm start: push over the existing channel as before.
-                    shareChannel?.invokeMethod("shareText", sharedText)
-                } else {
-                    // Cold start: Dart is not running yet — hold the text so
-                    // ShareIntentHandler can pull it via getInitialShareText
-                    // after the navigator is ready.
-                    pendingShareText = sharedText
-                }
+                shareChannel?.invokeMethod("shareText", sharedText)
             }
         }
     }

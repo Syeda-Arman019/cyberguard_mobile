@@ -29,12 +29,12 @@ class CyberCard extends StatelessWidget {
       width: double.infinity,
       padding: padding ?? const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: (backgroundColor ?? CyberColors.cardBg), // solid white card
+        color: (backgroundColor ?? CyberColors.cardBg).withAlpha(217), // ~85% glass
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: effectiveBorderColor, width: borderWidth),
         boxShadow: [
           BoxShadow(
-            color: CyberColors.textPrimary.withAlpha(18),
+            color: Colors.black.withAlpha(38),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -223,7 +223,7 @@ class PrimaryCyberButton extends StatelessWidget {
           borderRadius: BorderRadius.all(Radius.circular(26)),
           boxShadow: [
             BoxShadow(
-              color: Color(0x338B1E3F),
+              color: Color(0x332F6BFF),
               blurRadius: 10,
               offset: Offset(0, 3),
             ),
@@ -234,7 +234,7 @@ class PrimaryCyberButton extends StatelessWidget {
             backgroundColor: Colors.transparent,
             foregroundColor: CyberColors.buttonTextColor,
             disabledBackgroundColor: CyberColors.cyan.withAlpha(77),
-            disabledForegroundColor: CyberColors.textMuted.withAlpha(153),
+            disabledForegroundColor: CyberColors.bgDark.withAlpha(153),
             elevation: 0,
             shadowColor: Colors.transparent,
             shape: const StadiumBorder(),
@@ -343,15 +343,21 @@ class SectionHeader extends StatelessWidget {
               width: 3.5,
               height: 14,
               decoration: BoxDecoration(
-                color: CyberColors.skyBlue,
+                color: CyberColors.cyan,
                 borderRadius: BorderRadius.circular(2),
+                boxShadow: [
+                  BoxShadow(
+                    color: CyberColors.cyan.withAlpha(153),
+                    blurRadius: 4,
+                  ),
+                ],
               ),
             ),
             const SizedBox(width: 8),
             Text(
               title.toUpperCase(),
               style: const TextStyle(
-                color: CyberColors.skyBlue,
+                color: CyberColors.cyan,
                 fontSize: 11.5,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.5,
@@ -460,13 +466,13 @@ class ScanStatCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: CyberColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withAlpha(70), width: 1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withAlpha(71), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: CyberColors.textPrimary.withAlpha(23),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            color: color.withAlpha(15),
+            blurRadius: 10,
+            spreadRadius: 1,
           ),
         ],
       ),
@@ -476,25 +482,16 @@ class ScanStatCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              // Small rounded icon tile (consistent with list tiles app-wide).
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: color.withAlpha(36),
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Icon(icon, color: color, size: 16),
-              ),
-              const SizedBox(width: 8),
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   label,
                   style: TextStyle(
                     color: color,
-                    fontSize: 10.5,
+                    fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 1.0,
+                    letterSpacing: 1.1,
                   ),
                 ),
               ),
@@ -507,9 +504,9 @@ class ScanStatCard extends StatelessWidget {
               Text(
                 '$value',
                 style: TextStyle(
-                  color: CyberColors.textPrimary,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
+                  color: color,
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
                   height: 1,
                 ),
               ),
@@ -524,7 +521,7 @@ class ScanStatCard extends StatelessWidget {
                     color: color.withAlpha(28),
                     borderRadius: BorderRadius.circular(20),
                     border:
-                        Border.all(color: color.withAlpha(90), width: 1),
+                        Border.all(color: color.withAlpha(110), width: 1),
                   ),
                   child: Text(
                     'Details',
@@ -546,7 +543,7 @@ class ScanStatCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: card,
       ),

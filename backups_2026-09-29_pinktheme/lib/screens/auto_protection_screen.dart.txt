@@ -176,7 +176,7 @@ class _AutoProtectionScreenState extends State<AutoProtectionScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: CyberColors.cardBgElevated.withAlpha(220),
+                  color: CyberColors.bgDark.withAlpha(180),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: CyberColors.borderSubtle),
                 ),

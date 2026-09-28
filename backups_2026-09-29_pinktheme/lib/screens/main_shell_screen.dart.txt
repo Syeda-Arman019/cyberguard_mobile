@@ -44,12 +44,12 @@ class _MainShellScreenState extends State<MainShellScreen> {
       bottomNavigationBar: Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
         decoration: BoxDecoration(
-          color: CyberColors.bgSurface,
+          color: CyberColors.bgSurface.withAlpha(242),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: CyberColors.border, width: 1),
           boxShadow: [
             BoxShadow(
-              color: CyberColors.textPrimary.withAlpha(23),
+              color: Colors.black.withAlpha(51),
               blurRadius: 14,
               offset: const Offset(0, 4),
             ),
@@ -60,9 +60,8 @@ class _MainShellScreenState extends State<MainShellScreen> {
           child: NavigationBarTheme(
             data: NavigationBarThemeData(
               backgroundColor: Colors.transparent,
-              // Selected item = soft crimson pill with crimson icon+label
-              // (reference theme: crimson active nav).
-              indicatorColor: CyberColors.cyan.withAlpha(38),
+              // Selected item = light green pill (indicator) with dark icon.
+              indicatorColor: CyberColors.cyan.withAlpha(216),
               height: 62,
               labelTextStyle: WidgetStateProperty.resolveWith((states) {
                 final selected = states.contains(WidgetState.selected);
@@ -81,7 +80,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
                 for (final item in _navItems)
                   NavigationDestination(
                     icon: Icon(item.icon, color: CyberColors.textSecondary),
-                    selectedIcon: Icon(item.activeIcon, color: CyberColors.cyan),
+                    selectedIcon: Icon(item.activeIcon, color: CyberColors.bgDark),
                     label: item.label,
                   ),
               ],

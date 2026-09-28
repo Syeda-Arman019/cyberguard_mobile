@@ -2,7 +2,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
-import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/theme.dart';
 import '../models/scan_result.dart';
@@ -28,16 +27,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     with WidgetsBindingObserver, RouteAware {
   late List<ScanResult> _scans;
   bool _protectionEnabled = true;
-
-  // Read-only mirrors of the current security settings/permission state,
-  // shown in the compact Active Security Status section. Display only —
-  // all values are owned by Settings / the permission system.
-  bool _autoProtectionEnabled = false;
-  bool _childSafeMode = false;
-  bool _securityNotifications = true;
-  PermissionStatus? _cameraStatus;
-  PermissionStatus? _smsStatus;
-  PermissionStatus? _notificationStatus;
 
   @override
   void initState() {
@@ -86,59 +75,18 @@ class _DashboardScreenState extends State<DashboardScreen>
     _loadProtectionState();
   }
 
-  /// Reads the persisted security settings from SharedPreferences (the
-  /// same keys Settings writes) and the live permission statuses, so the
-  /// dashboard's Active Security Status section always reflects reality.
+  /// Reads the persisted Protection Mode value from SharedPreferences.
   Future<void> _loadProtectionState() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
       setState(() {
         _protectionEnabled = prefs.getBool('protection_mode_enabled') ?? true;
-        _autoProtectionEnabled =
-            prefs.getBool('auto_protection_enabled') ?? false;
-        _childSafeMode = prefs.getBool('child_safe_mode') ?? false;
-        _securityNotifications =
-            prefs.getBool('security_notifications') ?? true;
-      });
-      await _loadPermissionStatuses();
-    } catch (_) {
-      // Keep the last known values (defaults above) if prefs are unavailable.
-    }
-  }
-
-  /// Live permission statuses (same sources Settings reports).
-  Future<void> _loadPermissionStatuses() async {
-    try {
-      final camera = await Permission.camera.status;
-      PermissionStatus sms;
-      try {
-        sms = await Permission.sms.status;
-      } catch (_) {
-        sms = PermissionStatus.denied;
-      }
-      PermissionStatus notif;
-      try {
-        notif = await Permission.notification.status;
-      } catch (_) {
-        notif = PermissionStatus.denied;
-      }
-      if (!mounted) return;
-      setState(() {
-        _cameraStatus = camera;
-        _smsStatus = sms;
-        _notificationStatus = notif;
       });
     } catch (_) {
-      // Leave the previous statuses in place.
+      // Keep the last known value (defaults to true) if prefs are unavailable.
     }
   }
-
-  /// True only when every security-relevant permission is granted.
-  bool get _permissionsGranted =>
-      _cameraStatus == PermissionStatus.granted &&
-      _smsStatus == PermissionStatus.granted &&
-      _notificationStatus == PermissionStatus.granted;
 
   int get _total => _scans.length;
 
@@ -213,18 +161,13 @@ class _DashboardScreenState extends State<DashboardScreen>
         child: SafeArea(
           child: RefreshIndicator(
             onRefresh: () async => _refresh(),
-            color: CyberColors.buttonTextColor,
+            color: CyberColors.bgDark,
             backgroundColor: CyberColors.cyan,
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               children: [
                 // 1. Dashboard Header
                 _buildHeader(),
-                const SizedBox(height: 12),
-
-                // 1b. Active Security Status (read-only mirror of the
-                // current settings/permission state)
-                _buildSecurityStatusSection(),
                 const SizedBox(height: 22),
 
                 // 2. Scan Statistics
@@ -270,208 +213,91 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  // 1. Dashboard Header — hero card with the shield logo beside the
-  // module name, centered; the functional refresh button sits on the
-  // right edge. Height wraps its content (compact padding).
-  // White card with soft crimson shadow (reference theme style).
+  // 1. Dashboard Header — Argus-style light green gradient panel: frosted
+  // shield circle + title, protection status chip, and the functional
+  // refresh icon button in a frosted circle at the top-right.
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: CyberColors.cardBg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: CyberColors.border, width: 1),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2F6BFF), Color(0xFF5FA8FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: CyberColors.cyan.withAlpha(31),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF2F6BFF).withAlpha(70),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Centered group: logo + module name. Protection state is shown
-          // in the Active Security Status section below, not here.
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: CyberColors.cyan.withAlpha(15),
-                      border: Border.all(
-                          color: CyberColors.cyan.withAlpha(41), width: 1.5),
-                    ),
-                    child: const Icon(Icons.gpp_good_rounded,
-                        color: CyberColors.cyan, size: 24),
-                  ),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'URL Security',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: CyberColors.textPrimary,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-              ],
-          ),
-          // Functional refresh, pinned to the right edge. Sized exactly to
-          // the 40px circle (no default 48px tap-target padding) so the
-          // circle renders fully inside the compact header card.
-          Positioned(
-            right: 0,
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: CyberColors.cyan.withAlpha(15),
-                border: Border.all(color: CyberColors.cyan.withAlpha(41)),
-              ),
-              child: IconButton(
-                icon: const Icon(Icons.refresh_rounded,
-                    color: CyberColors.cyan, size: 20),
-                tooltip: 'Refresh Stats',
-                onPressed: _refresh,
-                padding: EdgeInsets.zero,
-                visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 1b. Active Security Status — compact, read-only mirror of the actual
-  // current security settings (SharedPreferences keys written by Settings)
-  // and live permission statuses. Purely a status display: changing any
-  // value still happens in Settings.
-  Widget _buildSecurityStatusSection() {
-    // Only actively-enabled protections/permissions are listed — inactive
-    // items stay out of the summary so it reads as an "active" status.
-    final activeItems = <Widget>[
-      if (_protectionEnabled)
-        _buildStatusChip(
-          icon: Icons.shield_rounded,
-          label: 'Protection Mode',
-        ),
-      if (_autoProtectionEnabled)
-        _buildStatusChip(
-          icon: Icons.notifications_rounded,
-          label: 'Auto Protection',
-        ),
-      if (_childSafeMode)
-        _buildStatusChip(
-          icon: Icons.child_care_rounded,
-          label: 'Child Safe Mode',
-        ),
-      if (_securityNotifications)
-        _buildStatusChip(
-          icon: Icons.notifications_active_rounded,
-          label: 'Notifications',
-        ),
-      if (_permissionsGranted)
-        _buildStatusChip(
-          icon: Icons.key_rounded,
-          label: 'Permissions Granted',
-        ),
-    ];
-
-    // Nothing active — don't take up space with an empty section.
-    if (activeItems.isEmpty) return const SizedBox.shrink();
-
-    return CyberCard(
-      padding: const EdgeInsets.all(14),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Stack(
+            alignment: Alignment.center,
             children: [
-              const Icon(Icons.verified_user_rounded,
-                  size: 14, color: CyberColors.cyan),
-              const SizedBox(width: 6),
-              Text(
-                'ACTIVE SECURITY STATUS',
-                style: TextStyle(
-                  color: CyberColors.textSecondary,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
+              // Centered title + status group
+              Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withAlpha(70),
+                          border: Border.all(
+                              color: Colors.white.withAlpha(140), width: 1.5),
+                        ),
+                        child: const Icon(Icons.gpp_good_rounded,
+                            color: CyberColors.bgDark, size: 26),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'URL Security',
+                        style: TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                          color: CyberColors.bgDark,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  SecurityStatusBadge(
+                    label: _protectionEnabled ? 'Protection ON' : 'Protection OFF',
+                    isProtected: _protectionEnabled,
+                    // White on the blue hero card: the semantic green has
+                    // poor contrast against the blue gradient.
+                    colorOverride: Colors.white,
+                  ),
+                ],
+              ),
+              // Functional refresh, pinned to the top-right corner.
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withAlpha(80),
+                    border: Border.all(color: Colors.white.withAlpha(140)),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.refresh_rounded,
+                        color: CyberColors.bgDark, size: 22),
+                    tooltip: 'Refresh Stats',
+                    onPressed: _refresh,
+                  ),
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 10),
-          // Compact 2-column grid of active status chips.
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 3.4,
-            padding: EdgeInsets.zero,
-            children: activeItems,
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// One compact status cell for the 2-column grid: tinted icon + label +
-  /// ON pill, in the semantic safe color. Only rendered when active.
-  Widget _buildStatusChip({
-    required IconData icon,
-    required String label,
-  }) {
-    const statusColor = CyberColors.safe;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(
-        color: statusColor.withAlpha(20),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: statusColor.withAlpha(56)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 14, color: statusColor),
-          const SizedBox(width: 5),
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: CyberColors.textPrimary,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: statusColor.withAlpha(41),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Text(
-              'ON',
-              style: TextStyle(
-                color: statusColor,
-                fontSize: 9.5,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.4,
-              ),
-            ),
           ),
         ],
       ),
@@ -554,71 +380,64 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     return CyberCard(
       padding: const EdgeInsets.all(18),
-      child: Column(
+      child: Row(
         children: [
-          Row(
-            children: [
-              // Donut visualization
-              SizedBox(
-                width: 118,
-                height: 118,
-                child: CustomPaint(
-                  painter: _DonutChartPainter(
-                    safe: _safeCount,
-                    suspicious: _suspiciousCount,
-                    malicious: _maliciousCount,
-                  ),
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '$_total',
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: CyberColors.textPrimary,
-                          ),
-                        ),
-                        const Text(
-                          'SCANS',
-                          style: TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.8,
-                            color: CyberColors.textMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+          // Donut visualization
+          SizedBox(
+            width: 125,
+            height: 125,
+            child: CustomPaint(
+              painter: _DonutChartPainter(
+                safe: _safeCount,
+                suspicious: _suspiciousCount,
+                malicious: _maliciousCount,
               ),
-              const SizedBox(width: 16),
-              // Legend Breakdown — aligned count + percentage columns
-              // (production style, matches the reference layout).
-              Expanded(
+              child: Center(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildLegendItem('Safe', _safeCount, _total, CyberColors.safe),
-                    const SizedBox(height: 12),
-                    _buildLegendItem('Suspicious', _suspiciousCount, _total, CyberColors.suspicious),
-                    const SizedBox(height: 12),
-                    _buildLegendItem('Malicious', _maliciousCount, _total, CyberColors.malicious),
+                    Text(
+                      '$_total',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        color: CyberColors.textPrimary,
+                      ),
+                    ),
+                    const Text(
+                      'SCANS',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                        color: CyberColors.textMuted,
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ],
+            ),
+          ),
+          const SizedBox(width: 20),
+          // Legend Breakdown
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildLegendItem('Safe', _safeCount, _total, CyberColors.safe),
+                const SizedBox(height: 10),
+                _buildLegendItem('Suspicious', _suspiciousCount, _total, CyberColors.suspicious),
+                const SizedBox(height: 10),
+                _buildLegendItem('Malicious', _maliciousCount, _total, CyberColors.malicious),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  /// Legend item: colored dot, label, then count and percentage aligned
-  /// to fixed-width columns so the three rows read as a clean grid.
   Widget _buildLegendItem(String label, int count, int total, Color color) {
     final pct = total > 0 ? (count / total * 100).toStringAsFixed(0) : '0';
     return Row(
@@ -626,9 +445,15 @@ class _DashboardScreenState extends State<DashboardScreen>
         Container(
           width: 10,
           height: 10,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(color: color.withAlpha(90), blurRadius: 4),
+            ],
+          ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
             label,
@@ -639,27 +464,12 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
           ),
         ),
-        SizedBox(
-          width: 30,
-          child: Text(
-            '$count',
-            style: const TextStyle(
-              color: CyberColors.textPrimary,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        SizedBox(
-          width: 46,
-          child: Text(
-            '($pct%)',
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              color: color,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-            ),
+        Text(
+          '$count ($pct%)',
+          style: TextStyle(
+            color: color,
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
           ),
         ),
       ],
@@ -1292,7 +1102,7 @@ class _TrendChartPainter extends CustomPainter {
 
     // Dots
     final dotOuterPaint = Paint()
-      ..color = CyberColors.cardBg
+      ..color = CyberColors.bgDark
       ..style = PaintingStyle.fill;
 
     final dotInnerPaint = Paint()

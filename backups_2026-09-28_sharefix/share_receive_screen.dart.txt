@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import '../core/theme.dart';
 import '../models/scan_result.dart';
@@ -31,23 +30,14 @@ class ShareReceiveScreen extends StatefulWidget {
   State<ShareReceiveScreen> createState() => _ShareReceiveScreenState();
 }
 
-class _ShareReceiveScreenState extends State<ShareReceiveScreen>
-    with WidgetsBindingObserver {
+class _ShareReceiveScreenState extends State<ShareReceiveScreen> {
   late final RiskEngine _engine;
 
-  bool _isAnalyzing = false;
+  bool _isAnalyzing = true;
   ScanResult? _result;
   String? _extractedUrl;
   String? _errorMessage;
   bool _alertSilenced = false;
-
-  /// Raw shared payload currently held by this screen.
-  String? _shareText;
-
-  /// Guard against late-arriving fallback deliveries: once this share has a
-  /// usable payload (result, extracted URL, or confirmed no-URL state),
-  /// `_processSharedText` ignores any further replacement.
-  bool _hasUsablePayload = false;
 
   static final _urlRegex = RegExp(
     r'https?://[^\s\]"<>]+',
@@ -57,76 +47,16 @@ class _ShareReceiveScreenState extends State<ShareReceiveScreen>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    ShareIntentHandler.markShareScreenOpen();
     _engine = widget.riskEngine ?? RiskEngine();
-    _shareText = widget.sharedText;
     _processSharedText(widget.sharedText);
-    // Show the analyzing state only when a payload is actually being
-    // analyzed. Opened with an empty/no-URL payload, the screen shows the
-    // No URL Detected error state immediately instead of a spinner.
-    if (_extractedUrl != null) {
-      setState(() => _isAnalyzing = true);
-    }
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Cold-start re-delivery: when the app was launched by a share, Android
-    // may resume with onNewIntent while this screen is still showing and the
-    // plugin stream has not fired. Re-pull the native pending EXTRA_TEXT on
-    // resume so the share is never lost between the two delivery paths.
-    if (state == AppLifecycleState.resumed) {
-      _retryNativePayload();
-    }
-  }
-
-  /// One-shot re-pull of the native pending EXTRA_TEXT. Runs only while this
-  /// screen still lacks a usable payload (e.g. it was opened with an empty
-  /// payload by a fallback racing the plugin).
-  Future<void> _retryNativePayload() async {
-    if (_hasUsablePayload) return;
-    try {
-      final nativeText = await const MethodChannel('com.example.cyberguard/share')
-          .invokeMethod<String>('getInitialShareText');
-      if (nativeText != null && nativeText.trim().isNotEmpty) {
-        _processSharedText(nativeText);
-      }
-    } catch (_) {
-      // Native side unavailable — nothing to re-pull.
-    }
   }
 
   Future<void> _processSharedText(String text) async {
-    // A late fallback must never replace an already-decided share: once a
-    // result is produced, a URL is being analyzed, or a no-URL verdict was
-    // reached from a non-empty payload, incoming text is ignored.
-    if (_hasUsablePayload) return;
-    if (text.trim().isEmpty) {
-      // Empty payload (e.g. the Features "Share Link" card opens this screen
-      // with no text): show the existing No URL Detected error state
-      // immediately instead of spinning forever. _hasUsablePayload stays
-      // false so a late cold-start delivery of the real payload can still
-      // upgrade this screen into the normal analysis flow.
-      if (mounted && _errorMessage == null) {
-        setState(() {
-          _isAnalyzing = false;
-          _errorMessage =
-              'No web URL was identified in the shared payload.\n\nMake sure to share a web link from your browser, social app, or paste a valid link.';
-        });
-      }
-      return;
-    }
-    _hasUsablePayload = true;
-    if (_shareText != null && _shareText != text) {
-      setState(() => _shareText = text);
-    }
     final match = _urlRegex.firstMatch(text.trim());
 
     if (match == null) {
-      // No URL found — surface the error state synchronously (never wait on
-      // async cleanup) so the screen never flashes or sticks on the
-      // analyzing spinner, then stop any alert sounds in the background.
+      // No URL found — make sure no alert keeps running.
+      await ScanAlertService.instance.stopSounds();
       if (mounted) {
         setState(() {
           _isAnalyzing = false;
@@ -134,7 +64,6 @@ class _ShareReceiveScreenState extends State<ShareReceiveScreen>
               'No web URL was identified in the shared payload.\n\nMake sure to share a web link from your browser, social app, or paste a valid link.';
         });
       }
-      await ScanAlertService.instance.stopSounds();
       return;
     }
 
@@ -171,8 +100,6 @@ class _ShareReceiveScreenState extends State<ShareReceiveScreen>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    ShareIntentHandler.markShareScreenClosed();
     // Never leave the siren/vibration running after leaving the screen.
     ScanAlertService.instance.stopSounds();
     super.dispose();
@@ -236,7 +163,7 @@ class _ShareReceiveScreenState extends State<ShareReceiveScreen>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: CyberColors.cardBgElevated.withAlpha(220),
+                      color: CyberColors.bgDark.withAlpha(150),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: CyberColors.border),
                     ),
@@ -353,90 +280,21 @@ class _ShareReceiveScreenState extends State<ShareReceiveScreen>
 class ShareIntentHandler {
   ShareIntentHandler._();
 
-  static const MethodChannel _nativeShareChannel =
-      MethodChannel('com.example.cyberguard/share');
-
-  /// Memoized per-delivery flag: the two native pushes (initial + stream)
-  /// and the two plugin callbacks can overlap for one user action, but the
-  /// ShareReceiveScreen must open only once per share.
-  static String? _lastDeliveredText;
-  static DateTime? _lastDeliveredAt;
-  static const Duration _dedupWindow = Duration(seconds: 2);
-
-  static bool _isDuplicate(String text) {
-    final at = _lastDeliveredAt;
-    if (_lastDeliveredText != text || at == null) return false;
-    final dup = DateTime.now().difference(at) < _dedupWindow;
-    if (!dup) {
-      _lastDeliveredText = null;
-      _lastDeliveredAt = null;
-    }
-    return dup;
-  }
-
-  static void _deliver(GlobalKey<NavigatorState> key, String text) {
-    if (_isDuplicate(text)) return;
-    _lastDeliveredText = text;
-    _lastDeliveredAt = DateTime.now();
-    _navigate(key, text);
-  }
-
   static void listen(GlobalKey<NavigatorState> navigatorKey) {
-    // Fallback 1 (cold start): MainActivity captured EXTRA_TEXT natively
-    // before Dart ran. Pull it once after the navigator is ready. Used only
-    // when the plugin path yields no usable text.
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      try {
-        final nativeText = await _nativeShareChannel
-            .invokeMethod<String>('getInitialShareText');
-        if (nativeText != null && nativeText.trim().isNotEmpty) {
-          _deliver(navigatorKey, nativeText);
-        }
-      } on MissingPluginException {
-        // Not running on Android (widget tests / other platforms).
-      } on PlatformException {
-        // Native side not ready — the plugin path below still applies.
-      } catch (_) {
-        // Never let the fallback break the primary share flow.
-      }
-    });
-
-    // Fallback 2 (warm start): MainActivity pushes EXTRA_TEXT over the same
-    // channel from onNewIntent. Consumed only if the plugin path has not
-    // already opened the ShareReceiveScreen for this share.
-    _nativeShareChannel.setMethodCallHandler((call) async {
-      if (call.method == 'shareText') {
-        final text = call.arguments as String?;
-        if (text != null && text.trim().isNotEmpty &&
-            !_shareScreenOpen) {
-          _deliver(navigatorKey, text);
-        }
-      }
-      return null;
-    });
-
-    // PRIMARY path (unchanged): receive_sharing_intent cold + warm delivery.
     ReceiveSharingIntent.instance.getInitialMedia().then((sharedFiles) {
       final text = _extractText(sharedFiles);
       if (text != null && text.isNotEmpty) {
-        _deliver(navigatorKey, text);
+        _navigate(navigatorKey, text);
       }
     });
 
     ReceiveSharingIntent.instance.getMediaStream().listen((sharedFiles) {
       final text = _extractText(sharedFiles);
       if (text != null && text.isNotEmpty) {
-        _deliver(navigatorKey, text);
+        _navigate(navigatorKey, text);
       }
     });
   }
-
-  /// Whether a ShareReceiveScreen is currently on the navigator stack.
-  /// Set by [ShareReceiveScreen]; lets the native warm-start push stand down
-  /// when the plugin already handled the share.
-  static bool _shareScreenOpen = false;
-  static void markShareScreenOpen() => _shareScreenOpen = true;
-  static void markShareScreenClosed() => _shareScreenOpen = false;
 
   static String? _extractText(List<SharedMediaFile> files) {
     for (final f in files) {

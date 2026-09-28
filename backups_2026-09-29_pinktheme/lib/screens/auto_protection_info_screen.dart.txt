@@ -245,7 +245,7 @@ class AutoProtectionInfoScreen extends StatelessWidget {
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: CyberColors.cyan,
-                    foregroundColor: CyberColors.buttonTextColor,
+                    foregroundColor: CyberColors.bgDark,
                     minimumSize: const Size(0, 48),
                   ),
                   onPressed: () => Navigator.of(context).push(
