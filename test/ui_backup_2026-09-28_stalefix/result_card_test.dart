@@ -8,13 +8,6 @@ void main() {
     testWidgets('renders all ScanResult details accurately', (WidgetTester tester) async {
       bool actionTapped = false;
 
-      // Large viewport: the ResultCard is a full detail sheet — on the default
-      // 800x600 test surface the action button falls under the app-bar shadow
-      // region and the tap is intercepted by ancestor hit-testers.
-      tester.view.physicalSize = const Size(1080, 2400);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() => tester.view.resetPhysicalSize());
-
       final scanResult = ScanResult(
         url: 'https://malicious-phish.xyz/login',
         riskScore: 75,

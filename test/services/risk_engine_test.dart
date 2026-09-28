@@ -71,15 +71,47 @@ void main() {
       expect(result.reasons, contains('The URL is unusually long, which attackers often use to hide malicious parameters.'));
     });
 
-    test('identifies brand impersonation (+15) and sets threatType to brandImpersonation', () async {
-      // Resembles paypal but is not legitimate paypal
+    test('brand-token domain with NO other evidence is NOT forced to impersonation', () async {
+      // BrandRegistry is a curated source, not a list of every legitimate
+      // domain. An unverified brand-token match alone must not force
+      // ThreatType.brandImpersonation or the Suspicious override.
       final result = await engine.analyzeUrl('https://paypal-security-alert.com', ScanSource.qr);
 
+      // Brand signal still contributes +15 as an unverified indicator.
       expect(result.riskScore, 15);
-      expect(result.threatType, ThreatType.brandImpersonation);
+      expect(result.riskLevel, RiskLevel.safe);
+      expect(result.threatType, ThreatType.none);
+      // The brand signal is still surfaced as information to the user.
       expect(result.reasons, contains('The domain resembles a well-known brand but is not an official domain.'));
-      expect(result.recommendation, contains('imitate a legitimate brand'));
       expect(result.source, ScanSource.qr);
+    });
+
+    test('share.google is NOT brand impersonation (legitimate brand-owned domain)', () async {
+      // .google is a restricted Google brand gTLD and share.google is
+      // infrastructure-allowlisted, so no brand signal fires at all.
+      final result = await engine.analyzeUrl('https://share.google/abc123', ScanSource.manual);
+
+      expect(result.threatType, ThreatType.none);
+      expect(result.riskLevel, RiskLevel.safe);
+      expect(result.riskScore, 0);
+    });
+
+    test('legitimate-looking unknown domain passes the normal pipeline', () async {
+      final result = await engine.analyzeUrl('https://newstartup.example/', ScanSource.manual);
+
+      expect(result.riskScore, 0);
+      expect(result.riskLevel, RiskLevel.safe);
+      expect(result.threatType, ThreatType.none);
+    });
+
+    test('brand token + independent suspicious evidence still confirms impersonation', () async {
+      // No-HTTPS (+15) is an independent indicator alongside the brand
+      // signal (+15): the forced Suspicious/brandImpersonation verdict applies.
+      final result = await engine.analyzeUrl('http://paypal-info.com', ScanSource.share);
+
+      expect(result.riskScore, 30);
+      expect(result.riskLevel, RiskLevel.suspicious);
+      expect(result.threatType, ThreatType.brandImpersonation);
     });
 
     test('does not flag legitimate brand domain as impersonation', () async {
@@ -141,7 +173,8 @@ void main() {
       final phishResult = await phishingEngine.analyzeUrl('https://example.com', ScanSource.manual);
 
       expect(phishResult.riskScore, 50);
-      expect(phishResult.riskLevel, RiskLevel.suspicious);
+      // Any Safe Browsing match forces Malicious regardless of the raw score.
+      expect(phishResult.riskLevel, RiskLevel.malicious);
       expect(phishResult.threatType, ThreatType.phishing);
       expect(phishResult.reasons, contains('Google Safe Browsing flagged this URL as an active phishing threat.'));
       expect(phishResult.recommendation, contains('Do not enter passwords, OTPs'));
@@ -249,6 +282,14 @@ void main() {
       expect(result.url, raw);
     });
 
+    test('BUG 2: http:// scheme is preserved exactly as submitted', () async {
+      const raw = 'http://example.com';
+      final result = await engine.analyzeUrl(raw, ScanSource.manual);
+
+      expect(result.url, raw); // never rewritten to https://
+      expect(result.url.startsWith('http://'), isTrue);
+    });
+
     // --- Verified brand registry ---
 
     test('official brand domains and subdomains are NOT flagged', () async {
@@ -264,13 +305,15 @@ void main() {
       }
     });
 
-    test('newly verified brands flag on non-official domains', () async {
+    test('confirmed impersonation: non-official brand domain + phishing keyword', () async {
+      // Brand token (+15) + credential keyword "login" (+10): two independent
+      // local indicators -> confirmed impersonation verdict with override.
       final result = await engine.analyzeUrl(
-          'https://wellsfargo-alerts.com', ScanSource.manual);
+          'https://wellsfargo-alerts.com/login', ScanSource.manual);
 
       expect(result.threatType, ThreatType.brandImpersonation);
       expect(result.riskLevel, RiskLevel.suspicious); // override
-      expect(result.riskScore, 15);
+      expect(result.riskScore, 25);
     });
 
     test('brand mention in PATH or QUERY is not impersonation', () async {
@@ -344,6 +387,19 @@ void main() {
       ]) {
         final result = await engine.analyzeUrl(url, ScanSource.manual);
         expect(result.threatType, ThreatType.none, reason: url);
+      }
+    });
+
+    test('share.google short-link domain is not brand impersonation', () async {
+      // .google is a restricted Google brand gTLD; share.google is Google's
+      // official short-link domain (Drive/Maps/YouTube shares).
+      for (final url in [
+        'https://share.google/abc123',
+        'https://maps.share.google/xyz',
+      ]) {
+        final result = await engine.analyzeUrl(url, ScanSource.manual);
+        expect(result.threatType, ThreatType.none, reason: url);
+        expect(result.riskLevel, RiskLevel.safe, reason: url);
       }
     });
 

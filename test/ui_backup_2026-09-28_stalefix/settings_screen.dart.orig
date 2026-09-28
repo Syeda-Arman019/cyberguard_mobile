@@ -487,31 +487,23 @@ bool _childSafeMode = false;
                       onChanged: (v) => _setApPref('auto_protection_notify_safe', v),
                     ),
                     const Divider(color: CyberColors.border, height: 24),
-                    // Transparent Material: this ListTile sits inside CyberCard's
-                    // colored DecoratedBox, so without its own Material ancestor
-                    // the framework throws "ListTile background color or ink
-                    // splashes may be invisible" in debug builds. Visual and
-                    // behavior are unchanged.
-                    Material(
-                      color: Colors.transparent,
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.apps_rounded, color: CyberColors.cyan),
-                        title: const Text('Apps to scan',
-                            style: TextStyle(
-                                color: CyberColors.textPrimary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14)),
-                        subtitle: Text(
-                          '${_apPackages.length} app(s) selected',
-                          style: const TextStyle(
-                              color: CyberColors.textSecondary, fontSize: 12),
-                        ),
-                        trailing: const Icon(Icons.chevron_right_rounded,
-                            color: CyberColors.cyan),
-                        onTap: _editAppPicker,
+                    ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.apps_rounded, color: CyberColors.cyan),
+                      title: const Text('Apps to scan',
+                          style: TextStyle(
+                              color: CyberColors.textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14)),
+                      subtitle: Text(
+                        '${_apPackages.length} app(s) selected',
+                        style: const TextStyle(
+                            color: CyberColors.textSecondary, fontSize: 12),
                       ),
+                      trailing: const Icon(Icons.chevron_right_rounded,
+                          color: CyberColors.cyan),
+                      onTap: _editAppPicker,
                     ),
                     const SizedBox(height: 8),
                     ElevatedButton.icon(

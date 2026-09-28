@@ -105,6 +105,10 @@ class LinkNotificationListener : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         try {
             val pkg = sbn.packageName ?: return
+            // Entry-level diagnostic: always logged (before any filter) so a
+            // "nothing detected" report can distinguish "callback never
+            // delivered" from "filtered by allowlist / flags".
+            Log.d(TAG, "onNotificationPosted: pkg=$pkg allowed=${pkg in allowedPackages}")
 
             // Never scan our own notifications (e.g. the danger alert or the
             // persistent "Auto Protection is ON" notice) — recursion guard.
@@ -120,6 +124,7 @@ class LinkNotificationListener : NotificationListenerService() {
             if (notif.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
 
             val texts = extractTexts(notif)
+            Log.d(TAG, "extracted ${texts.size} text(s) from $pkg: ${texts.joinToString(" | ") { it.take(80) }}")
             if (texts.isEmpty()) return
 
             for (text in texts) {

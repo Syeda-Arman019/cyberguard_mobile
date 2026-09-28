@@ -59,4 +59,38 @@ void main() {
     expect(find.text('SUSPICIOUS'), findsOneWidget);
     expect(find.text('41–70 Suspicious'), findsOneWidget);
   });
+
+  testWidgets('BUG 1: low-score safe result is never displayed as Suspicious',
+      (tester) async {
+    // Engine verdict: score 15, safe, suspiciousDomain (2 local flags).
+    // The badge must mirror the engine's riskLevel (SAFE), never escalate
+    // the display to SUSPICIOUS for a within-Safe-range score.
+    await tester.pumpWidget(_wrap(ResultCard(
+      scanResult: _scan(15, RiskLevel.safe, ThreatType.suspiciousDomain),
+    )));
+    expect(find.text('15/100'), findsOneWidget);
+    expect(find.text('SAFE'), findsOneWidget);
+    expect(find.text('SUSPICIOUS'), findsNothing);
+  });
+
+  testWidgets('BUG 2: result card displays the EXACT submitted URL (scheme preserved)',
+      (tester) async {
+    const raw = 'http://example.com';
+    final scan = ScanResult(
+      url: raw,
+      riskScore: 15,
+      riskLevel: RiskLevel.safe,
+      threatType: ThreatType.none,
+      reasons: const ['This website does not use a secure HTTPS connection.'],
+      recommendation: 'Test recommendation',
+      source: ScanSource.manual,
+      timestamp: DateTime(2026, 9, 27, 12, 0),
+    );
+    await tester.pumpWidget(_wrap(ResultCard(scanResult: scan)));
+
+    // ResultCard prints scanResult.url verbatim; the http:// scheme must
+    // never be rewritten to https:// anywhere in the display path.
+    expect(find.textContaining('http://example.com'), findsOneWidget);
+    expect(find.textContaining('https://example.com'), findsNothing);
+  });
 }

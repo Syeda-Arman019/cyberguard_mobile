@@ -47,18 +47,14 @@ void main() {
       expect(find.text('SUSPICIOUS'), findsOneWidget);
       expect(find.text('MALICIOUS'), findsOneWidget);
 
-      // Empty states (current dashboard copy)
+      // Empty states
       expect(find.text('No Scan History Available'), findsOneWidget);
-      expect(
-        find.text('Scan URLs to visualize safe, suspicious, and malicious distribution.'),
-        findsOneWidget,
-      );
-      expect(find.text('No scan data yet — scan URLs to build your risk trend.'), findsOneWidget);
-      expect(find.text('No risks detected yet'), findsOneWidget);
-      expect(
-        find.text('No scans yet. Scan a URL to start building your security history.'),
-        findsOneWidget,
-      );
+      expect(find.text('Scan more URLs to build your risk trend.'), findsOneWidget);
+      expect(find.text('No scans available yet'), findsOneWidget);
+      expect(find.text('Start scanning URLs to build your security insights.'), findsOneWidget);
+
+      // Full Security CTA
+      expect(find.text('View Full URL Security'), findsOneWidget);
     });
 
     testWidgets('renders real scan statistics and highest risk card when scans exist', (WidgetTester tester) async {
@@ -89,21 +85,15 @@ void main() {
         timestamp: DateTime.now().subtract(const Duration(hours: 1)),
       );
 
-      // Hive writes real async I/O — run outside the FakeAsync zone.
-      await tester.runAsync(() async {
-        await HistoryService.instance.saveScan(scan1);
-        await HistoryService.instance.saveScan(scan2);
-      });
+      await HistoryService.instance.saveScan(scan1);
+      await HistoryService.instance.saveScan(scan2);
 
       await tester.pumpWidget(
         const MaterialApp(
           home: DashboardScreen(),
         ),
       );
-      // Bounded pumps instead of pumpAndSettle: the populated dashboard keeps
-      // frames scheduled (chart/layout work), so settle never converges here.
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
 
       // Stats counts
       expect(find.text('2'), findsWidgets); // Total scans
@@ -111,7 +101,6 @@ void main() {
 
       // Donut Legend
       expect(find.text('Safe'), findsOneWidget);
-      expect(find.text('Suspicious'), findsOneWidget);
       expect(find.text('Malicious'), findsOneWidget);
 
       // Highest Risk Detected
@@ -121,10 +110,7 @@ void main() {
       expect(find.text('Phishing-related threat'), findsOneWidget);
 
       // Security Insight
-      expect(
-        find.text('You have scanned 2 URLs. 1 was flagged as potentially risky.'),
-        findsOneWidget,
-      );
+      expect(find.text('You have scanned 2 URLs. 1 was flagged as potentially risky.'), findsOneWidget);
     });
   });
 }

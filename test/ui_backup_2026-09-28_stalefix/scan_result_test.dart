@@ -75,15 +75,18 @@ void main() {
       expect(result.timestamp, testTime);
     });
 
-    test('fromJson is a strict contract: missing keys throw (documented behavior)', () {
-      // ScanResult.fromJson performs hard casts on every field — it is only
-      // ever fed JSON produced by toJson(). Missing keys raise a TypeError
-      // rather than silently defaulting, so corrupted records are never
-      // misread as "safe".
-      expect(
-        () => ScanResult.fromJson({'url': 'https://unknown.com'}),
-        throwsA(isA<TypeError>()),
-      );
+    test('handles fallback defaults on unknown/null JSON values gracefully', () {
+      final result = ScanResult.fromJson({
+        'url': 'https://unknown.com',
+      });
+
+      expect(result.url, 'https://unknown.com');
+      expect(result.riskScore, 0);
+      expect(result.riskLevel, RiskLevel.safe);
+      expect(result.threatType, ThreatType.none);
+      expect(result.reasons, isEmpty);
+      expect(result.recommendation, '');
+      expect(result.source, ScanSource.manual);
     });
 
     test('enforces riskScore 0-100 assertion', () {

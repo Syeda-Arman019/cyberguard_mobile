@@ -21,13 +21,13 @@ class ResultCard extends StatelessWidget {
     this.isCompact = false,
   });
 
-  /// Displayed risk level. Always mirrors [ScanResult.riskLevel]: the
-  /// engine's thresholds (0–40 safe, 41–70 suspicious, 71–100 malicious)
-  /// are the single source of truth shared by the engine, the gauge bands,
-  /// and the dashboard trend dots. A low score must never be DISPLAYED as
-  /// Suspicious merely because the threat type is suspiciousDomain — the
-  /// threat type row already conveys that classification.
-  RiskLevel get _effectiveRiskLevel => scanResult.riskLevel;
+  RiskLevel get _effectiveRiskLevel {
+    if (scanResult.threatType == ThreatType.suspiciousDomain &&
+        scanResult.riskLevel == RiskLevel.safe) {
+      return RiskLevel.suspicious;
+    }
+    return scanResult.riskLevel;
+  }
 
   Color get _riskColor {
     switch (_effectiveRiskLevel) {

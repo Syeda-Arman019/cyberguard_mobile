@@ -36,8 +36,8 @@ class BrandRegistry {
     'google': {'google.com', 'googlemail.com'},
     'youtube': {'youtube.com'},
     'microsoft': {'microsoft.com', 'outlook.com', 'office.com',
-      'office365.com', 'live.com', 'windowsupdate.com', 'microsoftonline.com'},
-    'apple': {'apple.com', 'icloud.com', 'cdn-apple.com'},
+      'office365.com', 'live.com', 'windowsupdate.com'},
+    'apple': {'apple.com', 'icloud.com'},
     'icloud': {'icloud.com'},
     'amazon': {'amazon.com', 'amazon.co.uk', 'amazon.de', 'amazon.in',
       'amazonpay.com', 'amazon-adsystem.com'},
@@ -50,9 +50,9 @@ class BrandRegistry {
     'dropbox': {'dropbox.com'},
 
     // Social / messaging
-    'facebook': {'facebook.com', 'fb.com', 'facebook.net'},
+    'facebook': {'facebook.com', 'fb.com'},
     'instagram': {'instagram.com'},
-    'whatsapp': {'whatsapp.com', 'whatsapp.net'},
+    'whatsapp': {'whatsapp.com'},
     'linkedin': {'linkedin.com'},
     'tiktok': {'tiktok.com'},
     'snapchat': {'snapchat.com'},
@@ -93,14 +93,6 @@ class BrandRegistry {
     'cdninstagram.com',
     'akamaihd.net',
     'cloudfront.net',
-    'googlevideo.com', // Google/YouTube media delivery
-    'googleadservices.com', // Google Ads (developers.google.com CSP guide)
-    'googletagmanager.com', // Google Tag Manager (developers.google.com CSP guide)
-    'google-analytics.com', // Google Analytics (developers.google.com CSP guide)
-    'googlesyndication.com', // Google ad serving (developers.google.com CSP guide)
-    'share.google', // .google brand gTLD — Google short links (Drive/Maps/YouTube).
-    // The .google gTLD is a restricted registry (Charleston Road Registry,
-    // an Alphabet subsidiary) that only Google entities may register in.
     'azure.microsoft.com',
   };
 

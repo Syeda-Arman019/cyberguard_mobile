@@ -129,19 +129,6 @@ class RiskEngine {
         reasons.add('Suspicious encoded URL pattern detected.');
       }
 
-      // Brand-signal escalation gate.
-      // A brand-token match NOT on the official-domain list is an UNVERIFIED
-      // signal by itself: BrandRegistry is a curated knowledge source, not a
-      // list of every legitimate domain (e.g. share.google, partner portals,
-      // brand-word domains never seen before). It escalates to a CONFIRMED
-      // brand impersonation verdict only when at least one OTHER independent
-      // local indicator also fired (no-HTTPS, raw IP, phishing keywords,
-      // long URL, traversal, suspicious encoding).
-      // The brand flag itself is already counted in localFlagsCount, so
-      // localFlagsCount >= 2 means "brand signal + other concrete evidence".
-      final bool confirmedBrandImpersonation =
-          isBrandImpersonation && localFlagsCount >= 2;
-
       // Cap risk score between 0 and 100
       final int riskScore = score.clamp(0, 100);
 
@@ -150,8 +137,8 @@ class RiskEngine {
       if (hasGoogleThreat) {
         // Any Google Safe Browsing threat (phishing or malware) forces Malicious
         riskLevel = RiskLevel.malicious;
-      } else if (confirmedBrandImpersonation) {
-        // Confirmed brand impersonation is treated as Suspicious regardless of score
+      } else if (isBrandImpersonation) {
+        // Brand impersonation is treated as Suspicious regardless of score
         riskLevel = RiskLevel.suspicious;
       } else if (riskScore <= 40) {
         riskLevel = RiskLevel.safe;
@@ -169,7 +156,7 @@ class RiskEngine {
         } else {
           threatType = ThreatType.malware;
         }
-      } else if (confirmedBrandImpersonation) {
+      } else if (isBrandImpersonation) {
         threatType = ThreatType.brandImpersonation;
       } else if (localFlagsCount >= 2) {
         threatType = ThreatType.suspiciousDomain;

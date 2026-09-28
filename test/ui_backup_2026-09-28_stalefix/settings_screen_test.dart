@@ -45,18 +45,17 @@ void main() {
       expect(find.text('DATA & STORAGE'), findsOneWidget);
       expect(find.text('SYSTEM INFORMATION'), findsOneWidget);
 
-      // Toggles verification (current settings screen: Protection Mode,
-      // Security Notifications, Child Safe Mode, Auto Protection layers,
-      // siren, vibration, safe-link notices — one Switch per toggle row).
+      // Toggles verification
       expect(find.text('🛡 Protection Mode'), findsOneWidget);
       expect(find.text('🔔 Security Notifications'), findsOneWidget);
 
+      // Find and tap switches to test responsiveness
       final switches = find.byType(Switch);
-      expect(switches, findsWidgets);
+      expect(switches, findsNWidgets(2));
 
-      // Toggle the first switch to test responsiveness
+      // Toggle Protection Mode switch
       await tester.tap(switches.first);
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
 
       // Permissions section verification
       expect(find.text('📷 Camera Permission'), findsOneWidget);
@@ -72,23 +71,21 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
 
-      // Seed 3 scans (Hive writes real async I/O — outside the FakeAsync zone)
-      await tester.runAsync(() async {
-        for (int i = 1; i <= 3; i++) {
-          await HistoryService.instance.saveScan(
-            ScanResult(
-              url: 'https://test$i.org',
-              riskScore: i * 20,
-              riskLevel: RiskLevel.safe,
-              threatType: ThreatType.none,
-              reasons: ['No threats detected'],
-              recommendation: 'Safe to proceed.',
-              source: ScanSource.manual,
-              timestamp: DateTime.now(),
-            ),
-          );
-        }
-      });
+      // Seed 3 scans
+      for (int i = 1; i <= 3; i++) {
+        await HistoryService.instance.saveScan(
+          ScanResult(
+            url: 'https://test$i.org',
+            riskScore: i * 20,
+            riskLevel: RiskLevel.safe,
+            threatType: ThreatType.none,
+            reasons: ['No threats detected'],
+            recommendation: 'Safe to proceed.',
+            source: ScanSource.manual,
+            timestamp: DateTime.now(),
+          ),
+        );
+      }
 
       await tester.pumpWidget(
         const MaterialApp(
@@ -111,19 +108,8 @@ void main() {
       expect(find.text('Cancel'), findsOneWidget);
       expect(find.text('Clear All'), findsOneWidget);
 
-      // Tap Clear All — the confirm handler awaits real Hive I/O
-      // (deleteAllScans → box.clear), which cannot complete inside the
-      // FakeAsync zone. Grant real-async windows between frame pumps so the
-      // write chain finishes and the app's setState(_totalScans = 0) lands.
+      // Tap Clear All
       await tester.tap(find.text('Clear All'));
-      await tester.pump();
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 400)),
-      );
-      await tester.pump();
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 400)),
-      );
       await tester.pumpAndSettle();
 
       // Total URLs count updates to 0
